@@ -6,8 +6,10 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'app/app.dart';
 import 'services/local_store.dart';
 import 'services/notification_service.dart';
+import 'services/update_service.dart';
 import 'state/app_state.dart';
 import 'widgets/stretch_effect_loader.dart';
+import 'widgets/update_dialog.dart';
 
 void main() async {
   // ① Flutter binding initialization
@@ -78,6 +80,30 @@ void _scheduleDeferredWarmup() {
     },
     Priority.idle,
   );
+
+  // 4. OTA update check — runs AFTER startup fully settles (3s delay) so the
+  //    network call never contends with first-run frames, fonts, or shaders.
+  SchedulerBinding.instance.scheduleTask<void>(
+    _checkForOtaUpdate,
+    Priority.idle,
+  );
+}
+
+/// Checks GitHub Releases for a newer APK and presents the update sheet.
+/// Fully fire-and-forget: every failure path silently no-ops.
+Future<void> _checkForOtaUpdate() async {
+  // Give startup + deferred warmup time to finish before touching the network.
+  await Future<void>.delayed(const Duration(seconds: 3));
+
+  try {
+    final update = await UpdateService.checkForUpdate();
+    final context = CampusTrackerApp.navigatorKey.currentContext;
+    if (update != null && context != null && context.mounted) {
+      showUpdateSheet(context, update);
+    }
+  } catch (e) {
+    debugPrint('Update check notice: $e');
+  }
 }
 
 /// Pre-warms the font rendering and text shaping pipeline to prevent font table

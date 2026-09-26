@@ -9,6 +9,11 @@ import 'app_shell.dart';
 class CampusTrackerApp extends StatelessWidget {
   const CampusTrackerApp({super.key});
 
+  /// Global navigator key so non-widget code (e.g. the OTA update checker in
+  /// main.dart) can present dialogs/bottom sheets over the app.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     final theme = context.select((AppState s) => s.settings.theme);
@@ -25,6 +30,7 @@ class CampusTrackerApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: AppTheme.build(colors, Brightness.light),
       darkTheme: AppTheme.build(AppColors.dark, Brightness.dark),
       themeMode: themeMode,
