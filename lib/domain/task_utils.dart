@@ -1,0 +1,56 @@
+import 'package:flutter/material.dart';
+import '../models/task.dart';
+import '../theme/app_colors.dart';
+
+enum TaskUrgency { overdue, dueToday, upcoming, completed }
+
+int _lastTodayCheckMillis = 0;
+String _cachedTodayStr = '';
+
+String _getTodayString() {
+  final nowMillis = DateTime.now().millisecondsSinceEpoch;
+  // Cache for 60 seconds to eliminate repeated DateTime allocations per frame
+  if (nowMillis - _lastTodayCheckMillis > 60000 || _cachedTodayStr.isEmpty) {
+    _lastTodayCheckMillis = nowMillis;
+    final today = DateTime.fromMillisecondsSinceEpoch(nowMillis);
+    _cachedTodayStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+  }
+  return _cachedTodayStr;
+}
+
+TaskUrgency getUrgency(Task task) {
+  if (task.status == TaskStatus.completed) return TaskUrgency.completed;
+  final todayStr = _getTodayString();
+  if (task.dueDate.compareTo(todayStr) < 0) return TaskUrgency.overdue;
+  if (task.dueDate == todayStr) return TaskUrgency.dueToday;
+  return TaskUrgency.upcoming;
+}
+
+Color urgencyBorderColor(TaskUrgency u, AppColors c) => switch (u) {
+      TaskUrgency.overdue => c.overdue,
+      TaskUrgency.dueToday => c.dueToday,
+      TaskUrgency.upcoming => c.accent,
+      TaskUrgency.completed => c.textTertiary,
+    };
+
+Color cardBgColor(TaskUrgency u, AppColors c) => switch (u) {
+      TaskUrgency.overdue => c.overdue,
+      TaskUrgency.dueToday => c.accent,
+      TaskUrgency.upcoming => c.upcoming,
+      TaskUrgency.completed => c.cardBg,
+    };
+
+String urgencyLabel(TaskUrgency u) => switch (u) {
+      TaskUrgency.overdue => 'Overdue',
+      TaskUrgency.dueToday => 'Due today',
+      TaskUrgency.upcoming => 'Upcoming',
+      TaskUrgency.completed => 'Completed',
+    };
+
+String subtitleText(Task task, [TaskUrgency? precomputedUrgency]) {
+  final typeName =
+      task.type.name[0].toUpperCase() + task.type.name.substring(1);
+  final u = precomputedUrgency ?? getUrgency(task);
+  return '$typeName \u00b7 ${urgencyLabel(u)}';
+}

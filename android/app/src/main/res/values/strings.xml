@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CampusTracker</string>
+    <string name="widget_description">Shows weekly task load and upcoming deadlines</string>
+    <string name="widget_month_description">Shows monthly task calendar heatmap and overview</string>
+</resources>

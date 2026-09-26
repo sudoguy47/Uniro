@@ -1,0 +1,210 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
+import '../models/task.dart';
+import '../models/settings.dart';
+import '../services/local_store.dart';
+import '../services/notification_service.dart';
+import 'package:flutter/services.dart';
+import '../domain/preloaded_tasks.dart';
+
+mixin AppCore on ChangeNotifier {
+  static const _widgetChannel = MethodChannel('com.example.uniro1/widget');
+  // ── State (RAM) ──────────────────────────────────────────────────────────
+  List<Task> _tasks = [];
+  UserSettings _settings = UserSettings.defaults();
+  TaskType? _activeFilter; // null = All
+  bool _isLoaded = false;
+  bool _isNewTaskOpen = false;
+
+  // ── Memoized Caches (Zero GC Pauses on Frame Cycles) ─────────────────────
+  List<Task>? _cachedPendingTasks;
+  List<Task>? _cachedHeroTasks;
+  List<Task>? _cachedCompletedTasks;
+  final Map<String, Map<String, int>> _cachedWeeklyLoad = {};
+
+  void _clearComputedCaches() {
+    _cachedPendingTasks = null;
+    _cachedHeroTasks = null;
+    _cachedCompletedTasks = null;
+    _cachedWeeklyLoad.clear();
+  }
+
+  List<Task> get tasks => List.unmodifiable(_tasks);
+  UserSettings get settings => _settings;
+  TaskType? get activeFilter => _activeFilter;
+  bool get isLoaded => _isLoaded;
+  bool get isNewTaskOpen => _isNewTaskOpen;
+
+  void setNewTaskOpen(bool isOpen) {
+    if (_isNewTaskOpen == isOpen) return;
+    _isNewTaskOpen = isOpen;
+    notifyListeners();
+  }
+
+  // ── Debounce Timer (GymMane pattern) ──────────────────────────────────────
+  Timer? _saveDebounce;
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _saveDebounce?.cancel();
+    super.dispose();
+  }
+
+  void _persist() {
+    if (_disposed) return;
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!_disposed) persistNow();
+    });
+  }
+
+  void persistNow() {
+    if (_disposed) return;
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
+    LocalStore.instance.save('tasks', _tasks.map((t) => t.toJson()).toList());
+    LocalStore.instance.save('settings', _settings.toJson());
+    _widgetChannel.invokeMethod('updateWidget').catchError((_) {});
+  }
+
+  // ── Boot (GymMane loadFromStore pattern with Preloaded Seed Data) ─────────
+  void loadFromStore() {
+    final rawTasks = LocalStore.instance.load('tasks');
+    if (rawTasks is List && rawTasks.isNotEmpty) {
+      _tasks = rawTasks
+          .map((j) => Task.fromJson(Map<String, dynamic>.from(j as Map)))
+          .toList();
+    } else {
+      // First launch or empty state: seed with realistic preloaded tasks
+      _tasks = getPreloadedTasks();
+      persistNow();
+    }
+    final rawSettings = LocalStore.instance.load('settings');
+    if (rawSettings != null) {
+      _settings = UserSettings.fromJson(Map<String, dynamic>.from(rawSettings as Map));
+    }
+    _clearComputedCaches();
+    _isLoaded = true;
+    notifyListeners();
+  }
+
+  // ── Task Actions ──────────────────────────────────────────────────────────
+  void addTask(Task task) {
+    _tasks.add(task);
+    _activeFilter = null;
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+    NotificationService.instance.scheduleForTask(task);
+  }
+
+  void updateTask(String id, Task updated) {
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    final old = _tasks[i];
+    _tasks[i] = updated;
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+    NotificationService.instance.cancelForTask(old);
+    NotificationService.instance.scheduleForTask(updated);
+  }
+
+  void completeTask(String id) {
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    _tasks[i] = _tasks[i].copyWith(
+      status: TaskStatus.completed,
+      completedAt: DateTime.now().toIso8601String(),
+    );
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+    NotificationService.instance.cancelForTask(_tasks[i]);
+  }
+
+  void uncompleteTask(String id) {
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i < 0) return;
+    _tasks[i] = _tasks[i].copyWith(
+      status: TaskStatus.pending,
+      clearCompletedAt: true,
+    );
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+    NotificationService.instance.scheduleForTask(_tasks[i]);
+  }
+
+  void deleteTask(String id) {
+    final i = _tasks.indexWhere((t) => t.id == id);
+    if (i >= 0) {
+      final old = _tasks[i];
+      NotificationService.instance.cancelForTask(old);
+    }
+    _tasks.removeWhere((t) => t.id == id);
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+  }
+
+  void setFilter(TaskType? filter) {
+    if (_activeFilter == filter) return;
+    _activeFilter = filter;
+    _cachedPendingTasks = null;
+    _cachedHeroTasks = null;
+    notifyListeners();
+  }
+
+  void updateSettings(UserSettings s) {
+    _settings = s;
+    notifyListeners();
+    LocalStore.instance.save('settings', s.toJson());
+  }
+
+  // ── Computed (Cached to eliminate Scavenge GC) ───────────────────────────
+  List<Task> get pendingTasks {
+    if (_cachedPendingTasks != null) return _cachedPendingTasks!;
+    var list = _tasks.where((t) => t.status == TaskStatus.pending).toList();
+    if (_activeFilter != null) {
+      list = list.where((t) => t.type == _activeFilter).toList();
+    }
+    list.sort((a, b) => a.dueDate.compareTo(b.dueDate));
+    return _cachedPendingTasks = List.unmodifiable(list);
+  }
+
+  List<Task> get completedTasks {
+    if (_cachedCompletedTasks != null) return _cachedCompletedTasks!;
+    return _cachedCompletedTasks = List.unmodifiable(
+      _tasks.where((t) => t.status == TaskStatus.completed).toList(),
+    );
+  }
+
+  List<Task> get heroTasks {
+    if (_cachedHeroTasks != null) return _cachedHeroTasks!;
+    return _cachedHeroTasks = List.unmodifiable(pendingTasks.take(6).toList());
+  }
+
+  List<Task> tasksForDate(String date) =>
+      _tasks.where((t) => t.dueDate == date).toList();
+
+  Map<String, int> weeklyLoad(String weekStart) {
+    final cached = _cachedWeeklyLoad[weekStart];
+    if (cached != null) return cached;
+
+    final fmt = DateFormat('yyyy-MM-dd');
+    final start = DateTime.parse(weekStart);
+    final map = <String, int>{};
+    for (int i = 0; i < 7; i++) {
+      final d = start.add(Duration(days: i));
+      final key = fmt.format(d);
+      map[key] = _tasks
+          .where((t) => t.dueDate == key && t.status == TaskStatus.pending)
+          .length;
+    }
+    return _cachedWeeklyLoad[weekStart] = Map.unmodifiable(map);
+  }
+}
