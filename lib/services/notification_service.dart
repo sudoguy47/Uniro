@@ -19,7 +19,7 @@ class NotificationService {
       'Notifications and scheduled reminders for campus tasks, classes, and exams';
 
   Future<void> init() async {
-    if (_initialized) return;
+    if (kIsWeb || _initialized) return;
 
     try {
       tz.initializeTimeZones();
@@ -83,6 +83,26 @@ class NotificationService {
     _initialized = true;
   }
 
+  /// Requests notification and exact alarm permissions (Android 13+ & iOS).
+  Future<bool> requestPermissions() async {
+    if (kIsWeb) return false;
+    try {
+      if (!_initialized) await init();
+      final androidImpl = _notifications.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidImpl != null) {
+        final notifGranted =
+            await androidImpl.requestNotificationsPermission() ?? false;
+        await androidImpl.requestExactAlarmsPermission();
+        return notifGranted;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('requestPermissions notice: $e');
+      return false;
+    }
+  }
+
   /// Calculates a stable integer ID for notifications
   int _makeNotificationId(String taskId, [String? suffix]) {
     final raw = suffix != null ? '$taskId:$suffix' : taskId;
@@ -91,6 +111,7 @@ class NotificationService {
 
   /// Schedules notifications for a task based on due date/time and reminders.
   Future<void> scheduleForTask(Task task) async {
+    if (kIsWeb) return;
     if (!_initialized) await init();
     if (task.status == TaskStatus.completed) {
       await cancelForTask(task);
@@ -210,7 +231,7 @@ class NotificationService {
 
   /// Cancels all scheduled notifications for a task.
   Future<void> cancelForTask(Task task) async {
-    if (!_initialized) return;
+    if (kIsWeb || !_initialized) return;
     try {
       // Cancel main task ID
       await _notifications.cancel(_makeNotificationId(task.id));
@@ -231,6 +252,7 @@ class NotificationService {
 
   /// Re-syncs all notifications for active pending tasks.
   Future<void> rescheduleAll(List<Task> tasks) async {
+    if (kIsWeb) return;
     if (!_initialized) await init();
     await cancelAll();
     for (final task in tasks) {
@@ -242,7 +264,7 @@ class NotificationService {
 
   /// Cancels all notifications.
   Future<void> cancelAll() async {
-    if (!_initialized) return;
+    if (kIsWeb || !_initialized) return;
     await _notifications.cancelAll();
   }
 
@@ -252,6 +274,7 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    if (kIsWeb) return;
     if (!_initialized) await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(

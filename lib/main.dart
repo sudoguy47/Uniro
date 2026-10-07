@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -92,6 +93,7 @@ void _scheduleDeferredWarmup() {
 /// Checks GitHub Releases for a newer APK and presents the update sheet.
 /// Fully fire-and-forget: every failure path silently no-ops.
 Future<void> _checkForOtaUpdate() async {
+  if (kIsWeb) return;
   // Give startup + deferred warmup time to finish before touching the network.
   await Future<void>.delayed(const Duration(seconds: 3));
 

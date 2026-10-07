@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -124,30 +125,52 @@ class _ProfileScreenState extends State<ProfileScreen>
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: c.accent,
-                              image: (s.avatarUri != null &&
-                                      s.avatarUri!.isNotEmpty &&
-                                      File(s.avatarUri!).existsSync())
-                                  ? DecorationImage(
-                                      image: FileImage(File(s.avatarUri!)),
+                              image: (() {
+                                if (s.avatarUri == null || s.avatarUri!.isEmpty) return null;
+                                if (kIsWeb) {
+                                  return DecorationImage(
+                                    image: NetworkImage(s.avatarUri!),
+                                    fit: BoxFit.cover,
+                                  );
+                                }
+                                try {
+                                  final file = File(s.avatarUri!);
+                                  if (file.existsSync()) {
+                                    return DecorationImage(
+                                      image: FileImage(file),
                                       fit: BoxFit.cover,
-                                    )
-                                  : null,
+                                    );
+                                  }
+                                } catch (_) {}
+                                return null;
+                              })(),
                             ),
                             alignment: Alignment.center,
-                            child: (s.avatarUri == null ||
-                                    s.avatarUri!.isEmpty ||
-                                    !File(s.avatarUri!).existsSync())
-                                ? Text(
-                                    s.name.isNotEmpty
-                                        ? s.name[0].toUpperCase()
-                                        : 'S',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                : null,
+                            child: (() {
+                              bool hasImage = false;
+                              if (s.avatarUri != null && s.avatarUri!.isNotEmpty) {
+                                if (kIsWeb) {
+                                  hasImage = true;
+                                } else {
+                                  try {
+                                    hasImage = File(s.avatarUri!).existsSync();
+                                  } catch (_) {}
+                                }
+                              }
+                              if (!hasImage) {
+                                return Text(
+                                  s.name.isNotEmpty
+                                      ? s.name[0].toUpperCase()
+                                      : 'S',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              }
+                              return null;
+                            })(),
                           ),
                           Positioned(
                             bottom: 0,

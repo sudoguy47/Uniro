@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -230,7 +231,19 @@ class _HeaderAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = avatarUri != null && avatarUri!.isNotEmpty;
+    ImageProvider? imageProvider;
+    if (avatarUri != null && avatarUri!.isNotEmpty) {
+      if (kIsWeb) {
+        imageProvider = NetworkImage(avatarUri!);
+      } else {
+        try {
+          final file = File(avatarUri!);
+          if (file.existsSync()) {
+            imageProvider = FileImage(file);
+          }
+        } catch (_) {}
+      }
+    }
 
     return Container(
       width: size,
@@ -238,15 +251,15 @@ class _HeaderAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: accent,
-        image: hasImage
+        image: imageProvider != null
             ? DecorationImage(
-                image: FileImage(File(avatarUri!)),
+                image: imageProvider,
                 fit: BoxFit.cover,
               )
             : null,
       ),
       alignment: Alignment.center,
-      child: !hasImage
+      child: imageProvider == null
           ? Text(
               name.isNotEmpty ? name[0].toUpperCase() : 'S',
               style: TextStyle(

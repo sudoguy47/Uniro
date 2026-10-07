@@ -47,10 +47,6 @@ class TaskCard extends StatelessWidget {
       BorderRadius.all(Radius.circular(16));
   static const BorderRadius _iconBorderRadius =
       BorderRadius.all(Radius.circular(8));
-  static const BorderRadius _urgencyBarRadius = BorderRadius.only(
-    topLeft: Radius.circular(16),
-    bottomLeft: Radius.circular(16),
-  );
 
   // ── Static Icons (Compile-Time Const) ──────────────────────────────
   static const Icon _docIcon = Icon(
@@ -67,12 +63,9 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
     final u = getUrgency(task);
-    final borderColor = urgencyBorderColor(u, c);
 
     // Retrieve memoized, zero-allocation styles & decorations
     final cardDecoration = _CardStyleCache.getCardDecoration(c.cardBg, c.border);
-    final urgencyDecoration =
-        _CardStyleCache.getUrgencyDecoration(borderColor);
     final iconBgDecoration =
         _CardStyleCache.getIconBgDecoration(c.cardBgRaised);
     final titleStyle = _CardStyleCache.getTitleStyle(
@@ -87,90 +80,72 @@ class TaskCard extends StatelessWidget {
       child: Container(
         height: TaskCard.cardHeight,
         margin: _cardMargin,
+        padding: _cardPadding,
         decoration: cardDecoration,
-        child: Stack(
+        child: Row(
           children: [
-            // Left urgency accent bar (Positioned avoids expensive multi-pass layout)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              child: Container(
-                width: 3,
-                decoration: urgencyDecoration,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: iconBgDecoration,
+              child: IconTheme(
+                data: IconThemeData(color: c.textSecondary),
+                child: _docIcon,
               ),
             ),
-
-            // Card Content
-            Padding(
-              padding: _cardPadding,
-              child: Row(
+            _gapW12,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: iconBgDecoration,
-                    child: IconTheme(
-                      data: IconThemeData(color: c.textSecondary),
-                      child: _docIcon,
-                    ),
+                  Text(
+                    task.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
                   ),
-                  _gapW12,
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          task.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: titleStyle,
-                        ),
-                        _gapH2,
-                        Text(
-                          subtitleText(task, u),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: subtitleStyle,
-                        ),
-                      ],
-                    ),
-                  ),
-                  _gapW12,
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (showCompleted && onDelete != null) ...[
-                        GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            onDelete!();
-                          },
-                          child: Padding(
-                            padding: _deletePadding,
-                            child: IconTheme(
-                              data: IconThemeData(color: c.textSecondary),
-                              child: _deleteIcon,
-                            ),
-                          ),
-                        ),
-                        _gapW8,
-                      ],
-
-                      // Isolated leaf completion button with its own ticker & state.
-                      // Prevents animation scale passes from dirtying parent compositing bits.
-                      _TaskCheckButton(
-                        showCompleted: showCompleted,
-                        accentColor: c.accent,
-                        borderColor: c.border,
-                        onComplete: onComplete,
-                      ),
-                    ],
+                  _gapH2,
+                  Text(
+                    subtitleText(task, u),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: subtitleStyle,
                   ),
                 ],
               ),
+            ),
+            _gapW12,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (showCompleted && onDelete != null) ...[
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onDelete!();
+                    },
+                    child: Padding(
+                      padding: _deletePadding,
+                      child: IconTheme(
+                        data: IconThemeData(color: c.textSecondary),
+                        child: _deleteIcon,
+                      ),
+                    ),
+                  ),
+                  _gapW8,
+                ],
+
+                // Isolated leaf completion button with its own ticker & state.
+                // Prevents animation scale passes from dirtying parent compositing bits.
+                _TaskCheckButton(
+                  showCompleted: showCompleted,
+                  accentColor: c.accent,
+                  borderColor: c.border,
+                  onComplete: onComplete,
+                ),
+              ],
             ),
           ],
         ),
@@ -264,7 +239,6 @@ class _CardStyleCache {
 
   // Decoration Caches
   static final Map<int, BoxDecoration> _cardDecorations = {};
-  static final Map<Color, BoxDecoration> _urgencyDecorations = {};
   static final Map<Color, BoxDecoration> _iconBgDecorations = {};
   static final Map<int, BoxDecoration> _checkDecorations = {};
 
@@ -281,16 +255,6 @@ class _CardStyleCache {
         color: bgColor,
         borderRadius: TaskCard._cardBorderRadius,
         border: Border.all(color: borderColor),
-      ),
-    );
-  }
-
-  static BoxDecoration getUrgencyDecoration(Color color) {
-    return _urgencyDecorations.putIfAbsent(
-      color,
-      () => BoxDecoration(
-        color: color,
-        borderRadius: TaskCard._urgencyBarRadius,
       ),
     );
   }

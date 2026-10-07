@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -56,7 +55,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
     final isNewTaskOpen = context.select((AppState s) => s.isNewTaskOpen);
-    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: c.pageBg,
@@ -76,17 +74,19 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             ],
           ),
 
-          // ── Truly Floating Navigation Bar ──────────────────────────────
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeInOutCubic,
-            left: 20,
-            right: 20,
-            bottom: isNewTaskOpen ? -120 : (16 + bottomInset),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 180),
-              opacity: isNewTaskOpen ? 0.0 : 1.0,
-              child: _BottomBar(current: _route, onTap: _navigate),
+          // ── Simple Docked Navigation Bar ──────────────────────────────
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AnimatedSlide(
+              offset: isNewTaskOpen ? const Offset(0, 1.2) : Offset.zero,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: _SimpleBottomNavBar(
+                current: _route,
+                onTap: _navigate,
+              ),
             ),
           ),
         ],
@@ -95,133 +95,84 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 }
 
-class _BottomBar extends StatelessWidget {
-  const _BottomBar({required this.current, required this.onTap});
-  final AppRoute current;
-  final void Function(AppRoute) onTap;
+class _SimpleBottomNavBar extends StatelessWidget {
+  const _SimpleBottomNavBar({
+    required this.current,
+    required this.onTap,
+  });
 
-  static const double _dockHeight = 64.0;
-  static const double _pillHeight = 48.0;
+  final AppRoute current;
+  final ValueChanged<AppRoute> onTap;
+
+  static const double _barContentHeight = 58.0;
 
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final idx = AppRoute.values.indexOf(current);
-
-    final borderColor =
-        isDark ? const Color(0x22FFFFFF) : const Color(0x14000000);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Container(
-      height: _dockHeight,
+      width: double.infinity,
+      padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
-        color: c.cardBg.withValues(alpha: isDark ? 0.94 : 0.96),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: borderColor, width: 1.0),
+        color: c.navBg,
+        border: Border(
+          top: BorderSide(
+            color: c.border.withValues(alpha: 0.65),
+            width: 1.0,
+          ),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.40 : 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: 1,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (ctx, constraints) {
-          final totalWidth = constraints.maxWidth;
-          final slotWidth = totalWidth / AppRoute.values.length;
-          final pillWidth = math.min(slotWidth - 8.0, 72.0);
-          final slotX = (slotWidth * idx) + (slotWidth - pillWidth) / 2;
+      child: SizedBox(
+        height: _barContentHeight,
+        child: Row(
+          children: AppRoute.values.map((route) {
+            final isActive = route == current;
+            final activeColor = c.accent;
+            final inactiveColor = c.navInactive;
 
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // Active sliding pill indicator
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                left: slotX,
-                top: (_dockHeight - _pillHeight) / 2,
-                width: pillWidth,
-                height: _pillHeight,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFFF5F2EB)
-                        : const Color(0xFF1E1B18),
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isDark ? Colors.white : Colors.black)
-                            .withValues(alpha: 0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
+            return Expanded(
+              child: InkResponse(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  onTap(route);
+                },
+                containedInkWell: true,
+                highlightShape: BoxShape.rectangle,
+                splashColor: c.accent.withValues(alpha: 0.12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isActive ? _fillIcon(route) : _outlineIcon(route),
+                      size: 24,
+                      color: isActive ? activeColor : inactiveColor,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _label(route),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isActive ? activeColor : inactiveColor,
+                        letterSpacing: -0.1,
                       ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-
-              // Navigation tab items
-              Row(
-                children: AppRoute.values.map((route) {
-                  final isActive = route == current;
-                  final activeFg =
-                      isDark ? const Color(0xFF1E1B18) : Colors.white;
-                  const inactiveFg = Color(0xFF9E9589);
-
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.lightImpact();
-                        onTap(route);
-                      },
-                      behavior: HitTestBehavior.opaque,
-                      child: SizedBox(
-                        height: _dockHeight,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            TweenAnimationBuilder<Color?>(
-                              duration: const Duration(milliseconds: 200),
-                              tween: ColorTween(
-                                begin: inactiveFg,
-                                end: isActive ? activeFg : inactiveFg,
-                              ),
-                              builder: (_, color, __) => Icon(
-                                isActive
-                                    ? _fillIcon(route)
-                                    : _outlineIcon(route),
-                                size: 21,
-                                color: color,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 200),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: isActive
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: isActive ? activeFg : inactiveFg,
-                              ),
-                              child: Text(
-                                _label(route),
-                                maxLines: 1,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          );
-        },
+            );
+          }).toList(),
+        ),
       ),
     );
   }

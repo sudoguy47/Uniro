@@ -21,7 +21,7 @@ class HeroTaskCard extends StatelessWidget {
     final typeLabel = task.type.name.toUpperCase();
 
     return Container(
-      width: screenWidth - 48,
+      width: double.infinity,
       height: 130,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
