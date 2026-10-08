@@ -33,6 +33,7 @@ class UpdateService {
 
   /// Information about an available update.
   static Future<UpdateInfo?> checkForUpdate() async {
+    if (_repo == 'YOUR_USERNAME/YOUR_REPO') return null;
     try {
       final info = await PackageInfo.fromPlatform();
       final currentVersion = info.version; // e.g. "1.0.0"

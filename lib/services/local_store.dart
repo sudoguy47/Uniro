@@ -21,4 +21,18 @@ class LocalStore {
     if (raw == null) return null;
     return jsonDecode(raw);
   }
+
+  bool get isOnboardingDone {
+    final raw = _prefs?.getString('ct_onboarding_done');
+    if (raw == null) return false;
+    try {
+      return jsonDecode(raw) == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void setOnboardingDone(bool done) {
+    save('onboarding_done', done);
+  }
 }

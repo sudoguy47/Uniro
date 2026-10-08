@@ -54,3 +54,14 @@ String subtitleText(Task task, [TaskUrgency? precomputedUrgency]) {
   final u = precomputedUrgency ?? getUrgency(task);
   return '$typeName \u00b7 ${urgencyLabel(u)}';
 }
+
+IconData iconForTaskType(TaskType t) => switch (t) {
+      TaskType.assignment => Icons.assignment_outlined,
+      TaskType.exam => Icons.quiz_outlined,
+      TaskType.ct => Icons.school_outlined,
+      TaskType.viva => Icons.record_voice_over_outlined,
+      TaskType.presentation => Icons.co_present_outlined,
+      TaskType.lab => Icons.science_outlined,
+      TaskType.project => Icons.architecture_outlined,
+      TaskType.other => Icons.event_note_outlined,
+    };

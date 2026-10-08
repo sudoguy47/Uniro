@@ -9,6 +9,7 @@ import 'services/local_store.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
 import 'state/app_state.dart';
+import 'state/notes_state.dart';
 import 'widgets/stretch_effect_loader.dart';
 import 'widgets/update_dialog.dart';
 
@@ -40,12 +41,18 @@ void main() async {
   // Hydrate state directly into RAM before mounting widgets.
   // Frame 1 renders with full hydrated data in a single pass without empty-state flashing.
   app.loadFromStore();
+  notesApp.loadFromStore();
+
+  final showOnboarding = !LocalStore.instance.isOnboardingDone;
 
   // ⑤ Mount the widget tree immediately.
   runApp(
-    ChangeNotifierProvider.value(
-      value: app,
-      child: const CampusTrackerApp(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: app),
+        ChangeNotifierProvider.value(value: notesApp),
+      ],
+      child: CampusTrackerApp(showOnboarding: showOnboarding),
     ),
   );
 

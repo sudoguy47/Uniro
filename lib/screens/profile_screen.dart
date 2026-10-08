@@ -119,58 +119,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                       onTap: _pickAvatar,
                       child: Stack(
                         children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: c.accent,
-                              image: (() {
-                                if (s.avatarUri == null || s.avatarUri!.isEmpty) return null;
-                                if (kIsWeb) {
-                                  return DecorationImage(
-                                    image: NetworkImage(s.avatarUri!),
-                                    fit: BoxFit.cover,
-                                  );
-                                }
-                                try {
-                                  final file = File(s.avatarUri!);
-                                  if (file.existsSync()) {
-                                    return DecorationImage(
-                                      image: FileImage(file),
-                                      fit: BoxFit.cover,
-                                    );
-                                  }
-                                } catch (_) {}
-                                return null;
-                              })(),
-                            ),
-                            alignment: Alignment.center,
-                            child: (() {
-                              bool hasImage = false;
-                              if (s.avatarUri != null && s.avatarUri!.isNotEmpty) {
-                                if (kIsWeb) {
-                                  hasImage = true;
-                                } else {
-                                  try {
-                                    hasImage = File(s.avatarUri!).existsSync();
-                                  } catch (_) {}
-                                }
-                              }
-                              if (!hasImage) {
-                                return Text(
-                                  s.name.isNotEmpty
-                                      ? s.name[0].toUpperCase()
-                                      : 'S',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                );
-                              }
-                              return null;
-                            })(),
+                          UserAvatar(
+                            avatarUri: s.avatarUri,
+                            name: s.name,
+                            size: 80,
                           ),
                           Positioned(
                             bottom: 0,

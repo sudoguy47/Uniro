@@ -7,11 +7,9 @@ class HeroTaskCard extends StatelessWidget {
   const HeroTaskCard({
     super.key,
     required this.task,
-    required this.screenWidth,
   });
 
   final Task task;
-  final double screenWidth;
 
   @override
   Widget build(BuildContext context) {

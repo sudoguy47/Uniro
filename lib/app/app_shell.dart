@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
+import '../state/notes_state.dart';
 import '../theme/app_colors.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/calendar_screen.dart';
+import '../screens/notes_screen.dart';
 import '../screens/done_screen.dart';
 import '../screens/profile_screen.dart';
 
-enum AppRoute { dashboard, calendar, done, profile }
+enum AppRoute { dashboard, calendar, notes, done, profile }
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -40,6 +42,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       app.persistNow();
+      notesApp.persistNow();
     }
   }
 
@@ -69,6 +72,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                 onNavigateToProfile: () => _navigate(AppRoute.profile),
               ),
               const CalendarScreen(),
+              const NotesScreen(),
               const DoneScreen(),
               const ProfileScreen(),
             ],
@@ -180,6 +184,7 @@ class _SimpleBottomNavBar extends StatelessWidget {
   IconData _fillIcon(AppRoute r) => switch (r) {
         AppRoute.dashboard => Icons.grid_view_rounded,
         AppRoute.calendar => Icons.calendar_month_rounded,
+        AppRoute.notes => Icons.note_alt_rounded,
         AppRoute.done => Icons.check_circle_rounded,
         AppRoute.profile => Icons.person_rounded,
       };
@@ -187,6 +192,7 @@ class _SimpleBottomNavBar extends StatelessWidget {
   IconData _outlineIcon(AppRoute r) => switch (r) {
         AppRoute.dashboard => Icons.grid_view_outlined,
         AppRoute.calendar => Icons.calendar_month_outlined,
+        AppRoute.notes => Icons.note_alt_outlined,
         AppRoute.done => Icons.check_circle_outline_rounded,
         AppRoute.profile => Icons.person_outline_rounded,
       };
@@ -194,6 +200,7 @@ class _SimpleBottomNavBar extends StatelessWidget {
   String _label(AppRoute r) => switch (r) {
         AppRoute.dashboard => 'Dashboard',
         AppRoute.calendar => 'Calendar',
+        AppRoute.notes => 'Notes',
         AppRoute.done => 'Done',
         AppRoute.profile => 'Profile',
       };

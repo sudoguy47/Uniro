@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<title>Uniro — Onboarding</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #D5803B;
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color .38s ease;
+}
+.phone {
+  width: 100vw; height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden; position: relative;
+}
+@media (min-width: 481px) {
+  body { padding: 32px 16px; background: #E8E4DF; }
+  .phone {
+    width: 360px; height: 740px;
+    border-radius: 50px;
+    box-shadow: 0 0 0 10px #1A1A1A, 0 32px 80px rgba(0,0,0,.35);
+  }
+}
+.island {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  width: 90px; height: 26px; background: #000;
+  border-radius: 20px; z-index: 20;
+}
+@media (max-width: 480px) {
+  .island { display: none; }
+}
+.slides { width: 100%; height: 100%; position: relative; }
+.slide {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  opacity: 0; transition: opacity .38s ease;
+  pointer-events: none;
+}
+.slide.active { opacity: 1; pointer-events: all; }
+
+/* Slide backgrounds */
+.slide-0 { background: #D5803B; }
+.slide-1 { background: #3B6EA5; }
+.slide-2 { background: #4A7C59; }
+.slide-3 { background: #8B5E9E; }
+
+/* Top Header Bar */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(20px + env(safe-area-inset-top, 16px)) 28px 0;
+  z-index: 10; position: relative;
+}
+.app-name {
+  font-size: 26px; font-weight: 900;
+  color: rgba(255,255,255,.95);
+  letter-spacing: .01em;
+}
+.btn-top-skip {
+  font-size: 14px; font-weight: 800;
+  color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 20px;
+  padding: 6px 14px; cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background .2s;
+}
+.btn-top-skip:hover { background: rgba(255,255,255,0.3); }
+
+/* Mascot */
+.mascot-wrap {
+  flex: 1; position: relative;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 8px; overflow: hidden;
+}
+.blob {
+  width: 280px; height: 260px;
+  position: absolute; top: -20px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: #fff; opacity: .18;
+}
+.mascot {
+  width: 210px; position: relative; z-index: 2;
+  animation: mascotFloat 3s ease-in-out infinite;
+}
+@keyframes mascotFloat {
+  0%,100% { transform: translateY(0) rotate(-1deg); }
+  50%      { transform: translateY(-12px) rotate(1deg); }
+}
+
+/* Content */
+.content { padding: 0 28px 0; z-index: 5; position: relative; }
+.headline {
+  font-size: 32px; font-weight: 900; color: #fff;
+  line-height: 1.06; text-transform: uppercase;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 12px rgba(0,0,0,.12);
+}
+.subline {
+  font-size: 14px; color: rgba(255,255,255,.75);
+  font-weight: 600; line-height: 1.5; margin-bottom: 20px;
+}
+
+/* Dots */
+.dots {
+  display: flex; gap: 6px; align-items: center;
+  padding: 0 28px 16px; z-index: 5; position: relative;
+}
+.dot {
+  height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,.35);
+  transition: width .3s, background .3s; width: 6px;
+}
+.dot.active { width: 22px; background: #fff; }
+
+/* Bottom Nav Bar */
+.bottom-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px calc(24px + env(safe-area-inset-bottom, 16px));
+  z-index: 5; position: relative;
+}
+.btn-back {
+  font-size: 14px; font-weight: 800;
+  color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 20px;
+  cursor: pointer; padding: 8px 16px;
+  display: flex; align-items: center; gap: 6px;
+  backdrop-filter: blur(6px);
+  transition: background .2s;
+}
+.btn-back:hover { background: rgba(255,255,255,.3); }
+.btn-back svg { width: 16px; height: 16px; stroke: #fff; }
+
+.btn-next-wrap { display: flex; align-items: center; gap: 10px; }
+.btn-next-label { font-size: 15px; font-weight: 800; color: #fff; }
+.btn-next {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  border: 2px solid rgba(255,255,255,.45);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .2s, transform .15s;
+}
+.btn-next:hover { background: rgba(255,255,255,.35); transform: scale(1.08); }
+.btn-next:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+.btn-next svg { width: 22px; height: 22px; }
+
+/* ── NAME SLIDE ── */
+.name-slide-inner {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; padding: 0 28px;
+  z-index: 5; position: relative;
+}
+.name-question {
+  font-size: 32px; font-weight: 900; color: #fff;
+  text-transform: uppercase; line-height: 1.05;
+  margin-bottom: 6px;
+}
+.name-sub {
+  font-size: 14px; color: rgba(255,255,255,.75);
+  font-weight: 600; margin-bottom: 18px;
+}
+
+/* Avatar File Picker Section */
+.avatar-section {
+  display: flex; flex-direction: column; align-items: center;
+  margin-bottom: 18px;
+}
+.avatar-wrap {
+  position: relative; width: 80px; height: 80px;
+  cursor: pointer;
+}
+.avatar-circle {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  border: 2.5px solid rgba(255,255,255,0.7);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.avatar-preview {
+  width: 100%; height: 100%; object-fit: cover; display: none;
+}
+.avatar-initial {
+  font-size: 34px; font-weight: 800; color: #fff;
+}
+.avatar-badge {
+  position: absolute; bottom: 0; right: 0;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.avatar-badge svg { width: 14px; height: 14px; fill: #4A7C59; }
+.avatar-label {
+  margin-top: 8px; font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.85);
+  cursor: pointer;
+}
+
+.name-input-wrap {
+  background: rgba(255,255,255,.18);
+  border: 2px solid rgba(255,255,255,.5);
+  border-radius: 18px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  backdrop-filter: blur(6px);
+  transition: border-color .2s, background .2s;
+}
+.name-input-wrap:focus-within {
+  background: rgba(255,255,255,.28);
+  border-color: rgba(255,255,255,.9);
+}
+.name-input-wrap svg { width: 22px; height: 22px; flex-shrink: 0; }
+.name-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 18px; font-weight: 700;
+  color: #fff; font-family: inherit;
+}
+.name-input::placeholder { color: rgba(255,255,255,.5); }
+.greeting {
+  margin-top: 14px; font-size: 20px; font-weight: 900;
+  color: rgba(255,255,255,.95);
+  min-height: 28px;
+}
+@keyframes greetPop {
+  from { transform: scale(.8); opacity: 0; }
+  to   { transform: scale(1);  opacity: 1; }
+}
+/* Floating emoji deco */
+.deco-emoji {
+  position: absolute; font-size: 44px;
+  opacity: .18; user-select: none; pointer-events: none;
+  animation: decoFloat 4s ease-in-out infinite;
+}
+.deco-emoji:nth-child(1) { top: 60px; right: 24px; animation-delay: 0s; }
+.deco-emoji:nth-child(2) { top: 130px; left: 16px; font-size: 34px; animation-delay: 1s; }
+.deco-emoji:nth-child(3) { bottom: 120px; right: 20px; font-size: 38px; animation-delay: .5s; }
+@keyframes decoFloat {
+  0%,100% { transform: translateY(0) rotate(-5deg); }
+  50%      { transform: translateY(-10px) rotate(5deg); }
+}
+
+/* ── NOTIF SLIDE extras ── */
+.notif-card {
+  margin: 0 28px 16px;
+  background: rgba(255,255,255,.15);
+  border: 1.5px solid rgba(255,255,255,.35);
+  border-radius: 16px; padding: 16px 18px;
+  display: flex; align-items: center; gap: 14px;
+  z-index: 5; position: relative; backdrop-filter: blur(4px);
+}
+.notif-icon-circle {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.notif-icon-circle svg { width: 22px; height: 22px; }
+.notif-card-text { flex: 1; }
+.notif-card-title { font-size: 14px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+.notif-card-sub { font-size: 12px; color: rgba(255,255,255,.65); }
+
+/* Toggle */
+.toggle {
+  width: 46px; height: 26px; border-radius: 13px;
+  background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.4);
+  cursor: pointer; position: relative; transition: background .3s;
+  flex-shrink: 0;
+}
+.toggle.on { background: #fff; }
+.toggle-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,255,255,.7);
+  position: absolute; top: 2px; left: 2px;
+  transition: left .25s cubic-bezier(0.34,1.56,0.64,1), background .25s;
+}
+.toggle.on .toggle-thumb { left: 22px; background: #8B5E9E; }
+.notif-status {
+  text-align: center; font-size: 13px; font-weight: 700;
+  color: rgba(255,255,255,.9); z-index: 5; position: relative;
+  padding: 0 28px 4px; min-height: 20px;
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="island"></div>
+  <div class="slides" id="slides">
+
+    <!-- ── SLIDE 0: Welcome ── -->
+    <div class="slide slide-0 active" id="slide-0">
+      <div class="top-bar">
+        <div class="app-name">Uniro</div>
+        <button class="btn-top-skip" onclick="skip()">Skip</button>
+      </div>
+      <div class="mascot-wrap">
+        <div class="blob"></div>
+        <svg class="mascot" viewBox="0 0 220 230" fill="none">
+          <ellipse cx="110" cy="145" rx="90" ry="80" fill="rgba(255,255,255,0.12)"/>
+          <path d="M30 130 Q20 80 50 55 Q80 25 110 22 Q140 25 170 55 Q200 80 190 130 Q185 175 110 185 Q35 175 30 130Z" fill="rgba(255,255,255,0.92)"/>
+          <ellipse cx="110" cy="38" rx="68" ry="18" fill="#1A1A1A"/>
+          <rect x="78" y="22" width="64" height="20" rx="6" fill="#1A1A1A"/>
+          <line x1="178" y1="38" x2="178" y2="72" stroke="#D5803B" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="178" cy="75" r="5" fill="#D5803B"/>
+          <ellipse cx="82" cy="110" rx="18" ry="20" fill="#1A1A1A"/>
+          <ellipse cx="138" cy="110" rx="18" ry="20" fill="#1A1A1A"/>
+          <ellipse cx="88" cy="105" rx="7" ry="8" fill="white"/>
+          <ellipse cx="144" cy="105" rx="7" ry="8" fill="white"/>
+          <ellipse cx="91" cy="103" rx="3" ry="3.5" fill="#1A1A1A"/>
+          <ellipse cx="147" cy="103" rx="3" ry="3.5" fill="#1A1A1A"/>
+          <line x1="70" y1="93" x2="66" y2="85" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="80" y1="90" x2="78" y2="81" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="126" y1="90" x2="124" y2="81" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="136" y1="93" x2="140" y2="85" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M88 145 Q110 162 132 145" stroke="#1A1A1A" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <ellipse cx="68" cy="138" rx="12" ry="8" fill="#D5803B" opacity=".3"/>
+          <ellipse cx="152" cy="138" rx="12" ry="8" fill="#D5803B" opacity=".3"/>
+        </svg>
+      </div>
+      <div class="content">
+        <div class="headline">GET YOUR<br/>CAMPUS TASKS<br/>DONE.</div>
+        <div class="subline">Stay on top of every deadline,<br/>stress-free.</div>
+      </div>
+      <div class="dots" id="dots-0"></div>
+      <div class="bottom-nav">
+        <button class="btn-back" style="visibility:hidden;">Back</button>
+        <div class="btn-next-wrap">
+          <span class="btn-next-label">Let's Start</span>
+          <button class="btn-next" onclick="goTo(1)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 1: Never miss a deadline ── -->
+    <div class="slide slide-1" id="slide-1">
+      <div class="top-bar">
+        <div class="app-name">Uniro</div>
+        <button class="btn-top-skip" onclick="skip()">Skip</button>
+      </div>
+      <div class="mascot-wrap">
+        <div class="blob"></div>
+        <svg class="mascot" viewBox="0 0 220 230" fill="none">
+          <rect x="20" y="60" width="180" height="155" rx="18" fill="rgba(255,255,255,0.92)"/>
+          <rect x="20" y="60" width="180" height="42" rx="18" fill="rgba(255,255,255,0.92)"/>
+          <rect x="20" y="84" width="180" height="18" fill="#3B6EA5" opacity=".12"/>
+          <rect x="70" y="50" width="12" height="24" rx="6" fill="#1A1A1A"/>
+          <rect x="138" y="50" width="12" height="24" rx="6" fill="#1A1A1A"/>
+          <circle cx="55"  cy="132" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="85"  cy="132" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="115" cy="132" r="7" fill="#D5803B"/>
+          <circle cx="145" cy="132" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="175" cy="132" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="55"  cy="160" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="85"  cy="160" r="5" fill="#4A7C59" opacity=".55"/>
+          <circle cx="115" cy="160" r="5" fill="#3B6EA5" opacity=".35"/>
+          <circle cx="145" cy="160" r="5" fill="#3B6EA5" opacity=".35"/>
+          <ellipse cx="82" cy="82" rx="16" ry="18" fill="#1A1A1A"/>
+          <ellipse cx="138" cy="82" rx="16" ry="18" fill="#1A1A1A"/>
+          <ellipse cx="88" cy="77" rx="6" ry="7" fill="white"/>
+          <ellipse cx="144" cy="77" rx="6" ry="7" fill="white"/>
+          <ellipse cx="90" cy="75" rx="3" ry="3" fill="#1A1A1A"/>
+          <ellipse cx="146" cy="75" rx="3" ry="3" fill="#1A1A1A"/>
+          <line x1="72" y1="65" x2="70" y2="58" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="80" y1="63" x2="80" y2="55" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="127" y1="63" x2="127" y2="55" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <line x1="135" y1="65" x2="137" y2="58" stroke="#1A1A1A" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M85 100 Q110 120 135 100" stroke="#1A1A1A" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+          <ellipse cx="65" cy="94" rx="11" ry="7" fill="#3B6EA5" opacity=".25"/>
+          <ellipse cx="155" cy="94" rx="11" ry="7" fill="#3B6EA5" opacity=".25"/>
+        </svg>
+      </div>
+      <div class="content">
+        <div class="headline">NEVER MISS<br/>A DEADLINE<br/>AGAIN.</div>
+        <div class="subline">Visual calendar keeps every<br/>due date in one place.</div>
+      </div>
+      <div class="dots" id="dots-1"></div>
+      <div class="bottom-nav">
+        <button class="btn-back" onclick="goBack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back
+        </button>
+        <div class="btn-next-wrap">
+          <span class="btn-next-label">Next</span>
+          <button class="btn-next" onclick="goTo(2)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 2: Enter Name & Avatar File ── -->
+    <div class="slide slide-2" id="slide-2">
+      <div class="top-bar">
+        <div class="app-name">Uniro</div>
+        <button class="btn-top-skip" onclick="skip()">Skip</button>
+      </div>
+
+      <!-- Floating deco -->
+      <span class="deco-emoji">🎓</span>
+      <span class="deco-emoji">📚</span>
+      <span class="deco-emoji">✏️</span>
+
+      <div class="name-slide-inner">
+        <div class="name-question">WHAT'S<br/>YOUR<br/>NAME?</div>
+        <div class="name-sub">We'll personalise your experience.</div>
+
+        <!-- Real Avatar Photo File Picker -->
+        <div class="avatar-section">
+          <div class="avatar-wrap" onclick="pickAvatar()">
+            <div class="avatar-circle">
+              <img id="avatarPreview" class="avatar-preview" src="" alt="Avatar" />
+              <span id="avatarInitial" class="avatar-initial">S</span>
+            </div>
+            <div class="avatar-badge">
+              <svg viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm8 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10z"/></svg>
+            </div>
+          </div>
+          <div class="avatar-label" onclick="pickAvatar()" id="avatarLabel">Add photo (optional)</div>
+        </div>
+
+        <div class="name-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+          </svg>
+          <input class="name-input" id="nameInput" type="text" maxlength="24"
+            placeholder="Enter your name…" oninput="updateGreeting()" />
+        </div>
+        <div class="greeting" id="greeting"></div>
+      </div>
+
+      <div class="dots" id="dots-2"></div>
+      <div class="bottom-nav">
+        <button class="btn-back" onclick="goBack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back
+        </button>
+        <div class="btn-next-wrap">
+          <span class="btn-next-label">Next</span>
+          <button class="btn-next" id="nameNextBtn" onclick="goTo(3)" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SLIDE 3: Notifications ── -->
+    <div class="slide slide-3" id="slide-3">
+      <div class="top-bar">
+        <div class="app-name">Uniro</div>
+        <button class="btn-top-skip" onclick="skip()">Skip</button>
+      </div>
+      <div class="mascot-wrap" style="padding-top:4px;">
+        <div class="blob"></div>
+        <svg class="mascot" viewBox="0 0 220 230" fill="none">
+          <path d="M110 30 C60 30 40 70 40 110 L40 150 Q40 165 55 165 L165 165 Q180 165 180 150 L180 110 C180 70 160 30 110 30Z" fill="rgba(255,255,255,0.92)"/>
+          <rect x="98" y="160" width="24" height="14" rx="7" fill="rgba(255,255,255,0.92)"/>
+          <path d="M98 30 Q110 18 122 30" stroke="rgba(255,255,255,0.92)" stroke-width="6" stroke-linecap="round" fill="none"/>
+          <ellipse cx="88" cy="100" rx="17" ry="19" fill="#1A1A1A"/>
+          <ellipse cx="132" cy="100" rx="17" ry="19" fill="#1A1A1A"/>
+          <ellipse cx="94" cy="95" rx="7" ry="7.5" fill="white"/>
+          <ellipse cx="138" cy="95" rx="7" ry="7.5" fill="white"/>
+          <ellipse cx="96" cy="93" rx="3" ry="3.5" fill="#1A1A1A"/>
+          <ellipse cx="140" cy="93" rx="3" ry="3.5" fill="#1A1A1A"/>
+          <path d="M76 82 Q88 74 100 80" stroke="#1A1A1A" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M120 80 Q132 74 144 82" stroke="#1A1A1A" stroke-width="3" stroke-linecap="round" fill="none"/>
+          <path d="M86 126 Q110 148 134 126" stroke="#1A1A1A" stroke-width="4" stroke-linecap="round" fill="rgba(0,0,0,.08)"/>
+          <circle cx="162" cy="45" r="18" fill="#D5803B"/>
+          <text x="162" y="51" text-anchor="middle" font-size="16" font-weight="900" fill="white">!</text>
+        </svg>
+      </div>
+      <div class="content">
+        <div class="headline">GET REMINDERS<br/>BEFORE IT'S<br/>TOO LATE.</div>
+        <div class="subline">Smart alerts keep you ahead.</div>
+      </div>
+
+      <!-- Notification toggle card -->
+      <div class="notif-card" id="notifCard">
+        <div class="notif-icon-circle">
+          <svg viewBox="0 0 24 24" fill="white"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+        </div>
+        <div class="notif-card-text">
+          <div class="notif-card-title">Enable Notifications</div>
+          <div class="notif-card-sub">Deadline alerts & reminders</div>
+        </div>
+        <div class="toggle" id="notifToggle" onclick="toggleNotif()">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+
+      <div class="notif-status" id="notifStatus"></div>
+      <div class="dots" id="dots-3"></div>
+      <div class="bottom-nav">
+        <button class="btn-back" onclick="goBack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Back
+        </button>
+        <div class="btn-next-wrap">
+          <span class="btn-next-label">Get Started</span>
+          <button class="btn-next" onclick="finishDemo(false)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /slides -->
+</div>
+
+<script>
+const TOTAL = 4;
+let cur = 0;
+let notifOn = false;
+let avatarUri = null;
+let isGreetingVisible = false;
+
+const SLIDE_COLORS = ['#D5803B', '#3B6EA5', '#4A7C59', '#8B5E9E'];
+
+function buildDots() {
+  for (let s = 0; s < TOTAL; s++) {
+    const c = document.getElementById('dots-' + s);
+    c.innerHTML = '';
+    for (let i = 0; i < TOTAL; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i === s ? ' active' : '');
+      c.appendChild(d);
+    }
+  }
+}
+
+function goTo(n) {
+  document.getElementById('slide-' + cur).classList.remove('active');
+  cur = Math.max(0, Math.min(TOTAL - 1, n));
+  document.getElementById('slide-' + cur).classList.add('active');
+
+  // Update body background color
+  document.body.style.backgroundColor = SLIDE_COLORS[cur];
+
+  // Update Back button visibility (hidden on Slide 0, visible on Slides 1, 2, 3)
+  const backBtns = document.querySelectorAll('.btn-back');
+  backBtns.forEach(btn => {
+    btn.style.visibility = (cur === 0) ? 'hidden' : 'visible';
+  });
+
+  if (cur === 2) setTimeout(() => document.getElementById('nameInput').focus(), 400);
+
+  // Notify Flutter of slide change to update native status bar color
+  if (window.FlutterChannel) {
+    window.FlutterChannel.postMessage(JSON.stringify({
+      action: 'slideChange',
+      color: SLIDE_COLORS[cur]
+    }));
+  }
+}
+
+function goBack() {
+  if (cur > 0) {
+    goTo(cur - 1);
+  }
+}
+
+function skip() {
+  finishDemo(true);
+}
+
+function updateGreeting() {
+  const name = document.getElementById('nameInput').value.trim();
+  const g = document.getElementById('greeting');
+  const btn = document.getElementById('nameNextBtn');
+  const initial = document.getElementById('avatarInitial');
+
+  if (name) {
+    g.textContent = 'Hey, ' + name + '! 👋';
+    if (!isGreetingVisible) {
+      isGreetingVisible = true;
+      g.style.animation = 'greetPop .35s cubic-bezier(0.34,1.56,0.64,1) both';
+    }
+    btn.disabled = false;
+    initial.textContent = name.charAt(0).toUpperCase();
+  } else {
+    isGreetingVisible = false;
+    g.textContent = '';
+    g.style.animation = 'none';
+    btn.disabled = true;
+    initial.textContent = 'S';
+  }
+}
+
+function pickAvatar() {
+  if (window.FlutterChannel) {
+    window.FlutterChannel.postMessage(JSON.stringify({ action: 'pickAvatar' }));
+  }
+}
+
+function setAvatarPreview(src) {
+  avatarUri = src;
+  const img = document.getElementById('avatarPreview');
+  const initial = document.getElementById('avatarInitial');
+  const label = document.getElementById('avatarLabel');
+  if (src) {
+    img.src = src;
+    img.style.display = 'block';
+    initial.style.display = 'none';
+    label.textContent = 'Change photo';
+  }
+}
+
+function toggleNotif() {
+  if (window.FlutterChannel) {
+    window.FlutterChannel.postMessage(JSON.stringify({ action: 'requestNotifications' }));
+  } else {
+    setNotifStatus(!notifOn);
+  }
+}
+
+function setNotifStatus(granted) {
+  notifOn = granted;
+  const toggle = document.getElementById('notifToggle');
+  const status = document.getElementById('notifStatus');
+  toggle.classList.toggle('on', notifOn);
+  status.textContent = notifOn ? '✓ Notifications enabled!' : 'Notifications disabled in settings';
+}
+
+function finishDemo(skipped = false) {
+  const name = document.getElementById('nameInput').value.trim();
+  const payload = {
+    action: 'finish',
+    name: name || 'Student',
+    avatarUri: avatarUri,
+    notificationsEnabled: notifOn && !skipped,
+    skipped: skipped
+  };
+
+  if (window.FlutterChannel) {
+    window.FlutterChannel.postMessage(JSON.stringify(payload));
+  } else {
+    // Web standalone preview fallback
+    document.getElementById('nameInput').value = '';
+    updateGreeting();
+    notifOn = false;
+    document.getElementById('notifToggle').classList.remove('on');
+    document.getElementById('notifStatus').textContent = '';
+    setTimeout(() => goTo(0), 200);
+  }
+}
+
+buildDots();
+// Initialize back button visibility
+goTo(0);
+</script>
+</body>
+</html>

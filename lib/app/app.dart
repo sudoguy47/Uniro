@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/settings.dart';
+import '../screens/onboarding_screen.dart';
 import '../state/app_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import 'app_shell.dart';
 
 class CampusTrackerApp extends StatelessWidget {
-  const CampusTrackerApp({super.key});
+  const CampusTrackerApp({super.key, this.showOnboarding = false});
+
+  final bool showOnboarding;
 
   /// Global navigator key so non-widget code (e.g. the OTA update checker in
   /// main.dart) can present dialogs/bottom sheets over the app.
@@ -34,7 +37,7 @@ class CampusTrackerApp extends StatelessWidget {
       theme: AppTheme.build(colors, Brightness.light),
       darkTheme: AppTheme.build(AppColors.dark, Brightness.dark),
       themeMode: themeMode,
-      home: const AppShell(),
+      home: showOnboarding ? const OnboardingScreen() : const AppShell(),
     );
   }
 }

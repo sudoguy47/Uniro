@@ -200,11 +200,10 @@ class _DashboardHeader extends StatelessWidget {
                     onNavigateToProfile?.call();
                   },
                   behavior: HitTestBehavior.opaque,
-                  child: _HeaderAvatar(
+                  child: UserAvatar(
                     avatarUri: avatarUri,
                     name: name,
                     size: 48,
-                    accent: c.accent,
                   ),
                 ),
               ],
@@ -212,63 +211,6 @@ class _DashboardHeader extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _HeaderAvatar extends StatelessWidget {
-  const _HeaderAvatar({
-    required this.avatarUri,
-    required this.name,
-    required this.size,
-    required this.accent,
-  });
-
-  final String? avatarUri;
-  final String name;
-  final double size;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    ImageProvider? imageProvider;
-    if (avatarUri != null && avatarUri!.isNotEmpty) {
-      if (kIsWeb) {
-        imageProvider = NetworkImage(avatarUri!);
-      } else {
-        try {
-          final file = File(avatarUri!);
-          if (file.existsSync()) {
-            imageProvider = FileImage(file);
-          }
-        } catch (_) {}
-      }
-    }
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: accent,
-        image: imageProvider != null
-            ? DecorationImage(
-                image: imageProvider,
-                fit: BoxFit.cover,
-              )
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: imageProvider == null
-          ? Text(
-              name.isNotEmpty ? name[0].toUpperCase() : 'S',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.42,
-                fontWeight: FontWeight.w700,
-              ),
-            )
-          : null,
     );
   }
 }

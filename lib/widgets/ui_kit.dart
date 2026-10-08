@@ -1,8 +1,75 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../models/task.dart';
+
+// ══════════════════════════════════════════════════════════════
+// UserAvatar — Reusable Non-blocking User Avatar Component
+// ══════════════════════════════════════════════════════════════
+class UserAvatar extends StatelessWidget {
+  const UserAvatar({
+    super.key,
+    required this.avatarUri,
+    required this.name,
+    this.size = 48.0,
+  });
+
+  final String? avatarUri;
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
+
+    final fallbackText = Text(
+      initial,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.42,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+
+    Widget? imageWidget;
+    if (avatarUri != null && avatarUri!.isNotEmpty) {
+      if (kIsWeb) {
+        imageWidget = Image.network(
+          avatarUri!,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Center(child: fallbackText),
+        );
+      } else {
+        imageWidget = Image.file(
+          File(avatarUri!),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Center(child: fallbackText),
+        );
+      }
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: c.accent,
+      ),
+      alignment: Alignment.center,
+      child: imageWidget != null
+          ? ClipOval(child: imageWidget)
+          : fallbackText,
+    );
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // PrimaryButton — GymMane PrimaryButton

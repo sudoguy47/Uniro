@@ -69,7 +69,6 @@ class _HeroCarouselState extends State<HeroCarousel> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     return Column(
       children: [
@@ -84,7 +83,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
               final task = widget.tasks[index];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: HeroTaskCard(task: task, screenWidth: screenWidth),
+                child: HeroTaskCard(task: task),
               );
             },
           ),

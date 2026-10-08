@@ -38,14 +38,7 @@ class AppTheme {
     );
   }
 
-  // Motion tokens
+  // Motion tokens (used in UI animations & transitions)
   static const micro = Duration(milliseconds: 140);
   static const fast = Duration(milliseconds: 200);
-  static const screen = Duration(milliseconds: 260);
-  static const navGlide = Duration(milliseconds: 340);
-  static const modal = Duration(milliseconds: 320);
-
-  static const easeOutCubic = Curves.easeOutCubic;
-  static const switchIn = Interval(0.3, 1.0, curve: Curves.easeOutCubic);
-  static const switchOut = Interval(0.6, 1.0, curve: Curves.easeOutCubic);
 }

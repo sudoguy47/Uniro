@@ -18,19 +18,21 @@ mixin AppCore on ChangeNotifier {
   bool _isNewTaskOpen = false;
 
   // ── Memoized Caches (Zero GC Pauses on Frame Cycles) ─────────────────────
+  List<Task>? _cachedUnmodifiableTasks;
   List<Task>? _cachedPendingTasks;
   List<Task>? _cachedHeroTasks;
   List<Task>? _cachedCompletedTasks;
   final Map<String, Map<String, int>> _cachedWeeklyLoad = {};
 
   void _clearComputedCaches() {
+    _cachedUnmodifiableTasks = null;
     _cachedPendingTasks = null;
     _cachedHeroTasks = null;
     _cachedCompletedTasks = null;
     _cachedWeeklyLoad.clear();
   }
 
-  List<Task> get tasks => List.unmodifiable(_tasks);
+  List<Task> get tasks => _cachedUnmodifiableTasks ??= List.unmodifiable(_tasks);
   UserSettings get settings => _settings;
   TaskType? get activeFilter => _activeFilter;
   bool get isLoaded => _isLoaded;

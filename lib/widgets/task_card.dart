@@ -88,9 +88,10 @@ class TaskCard extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: iconBgDecoration,
-              child: IconTheme(
-                data: IconThemeData(color: c.textSecondary),
-                child: _docIcon,
+              child: Icon(
+                iconForTaskType(task.type),
+                size: 18,
+                color: c.textSecondary,
               ),
             ),
             _gapW12,
