@@ -197,7 +197,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       notificationsEnabled: false,
                     ),
                     style: TextButton.styleFrom(
-                      backgroundColor: Colors.white18,
+                      backgroundColor: Colors.white24,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
