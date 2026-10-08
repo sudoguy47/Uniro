@@ -49,11 +49,6 @@ class TaskCard extends StatelessWidget {
       BorderRadius.all(Radius.circular(8));
 
   // ── Static Icons (Compile-Time Const) ──────────────────────────────
-  static const Icon _docIcon = Icon(
-    Icons.description_outlined,
-    size: 18,
-  );
-
   static const Icon _deleteIcon = Icon(
     Icons.delete_outline,
     size: 18,

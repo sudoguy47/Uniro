@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'app/app.dart';
 import 'services/local_store.dart';
+import 'services/notes_store.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
 import 'state/app_state.dart';
@@ -33,15 +34,17 @@ void main() async {
   // ④ Phase 1 Bootstrap: Hydrate SharedPreferences and date formatting BEFORE first frame.
   // Running disk I/O and SharedPreferencesApi.getAll during the native splash phase avoids
   // platform channel IPC contention with the Flutter engine's VSync frame pump.
+  final notesStore = NotesStore();
   await Future.wait([
     LocalStore.instance.init(),
+    notesStore.load(),
     initializeDateFormatting(),
   ]);
 
   // Hydrate state directly into RAM before mounting widgets.
   // Frame 1 renders with full hydrated data in a single pass without empty-state flashing.
   app.loadFromStore();
-  notesApp.loadFromStore();
+  final notesState = NotesState(store: notesStore);
 
   final showOnboarding = !LocalStore.instance.isOnboardingDone;
 
@@ -50,7 +53,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: app),
-        ChangeNotifierProvider.value(value: notesApp),
+        ChangeNotifierProvider(create: (_) => notesState),
       ],
       child: CampusTrackerApp(showOnboarding: showOnboarding),
     ),
