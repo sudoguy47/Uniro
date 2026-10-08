@@ -137,6 +137,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
       ctrl.addListener(() {
         final newText = ctrl.text;
+
+        // Detect Enter key (\n) typed on soft keyboard
+        if (newText.contains('\n')) {
+          _handleEnterPressed(i, newText);
+          return;
+        }
+
         _checkAutoFormatShortcuts(i, newText);
         block.text = ctrl.text;
         _onContentChanged();
@@ -145,6 +152,55 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _blockControllers.add(ctrl);
       _blockFocusNodes.add(focus);
     }
+  }
+
+  void _handleEnterPressed(int index, String rawText) {
+    final block = _note.blocks[index];
+    final parts = rawText.split('\n');
+    final currentPart = parts[0];
+    final nextPart = parts.sublist(1).join('\n');
+
+    // Case 1: Pressing Enter on an EMPTY checklist/bullet/numbered block
+    if (currentPart.isEmpty && block.text.isEmpty && block.type != NoteBlockType.paragraph) {
+      setState(() {
+        block.type = NoteBlockType.paragraph;
+        _blockControllers[index].value = const TextEditingValue(text: '');
+      });
+      _onContentChanged();
+      return;
+    }
+
+    // Case 2: Normal Enter press in a block (e.g. checklist)
+    block.text = currentPart;
+    _blockControllers[index].value = TextEditingValue(
+      text: currentPart,
+      selection: TextSelection.collapsed(offset: currentPart.length),
+    );
+
+    final newType = (block.type == NoteBlockType.heading1 || block.type == NoteBlockType.heading2)
+        ? NoteBlockType.paragraph
+        : block.type;
+
+    final newBlock = NoteBlock(
+      type: newType,
+      text: nextPart,
+    );
+
+    setState(() {
+      _note.blocks.insert(index + 1, newBlock);
+      _initBlockControllers();
+    });
+
+    _onContentChanged();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (index + 1 < _blockFocusNodes.length) {
+        _blockFocusNodes[index + 1].requestFocus();
+        _blockControllers[index + 1].selection = TextSelection.collapsed(
+          offset: _blockControllers[index + 1].text.length,
+        );
+      }
+    });
   }
 
   void _checkAutoFormatShortcuts(int index, String text) {
@@ -1208,6 +1264,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
               AppBar(
                 backgroundColor: c.pageBg,
                 elevation: 0,
+                titleSpacing: 0,
                 leading: IconButton(
                   icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary),
                   onPressed: () {
@@ -1218,7 +1275,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 title: GestureDetector(
                   onTap: _showFolderPicker,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: c.cardBgRaised,
                       borderRadius: BorderRadius.circular(999),
@@ -1227,12 +1284,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '${_note.folder} v',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: c.textPrimary,
+                        Flexible(
+                          child: Text(
+                            '${_note.folder} v',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: c.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1244,39 +1305,57 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   // Undo Button
                   Opacity(
                     opacity: _undoStack.isNotEmpty ? 1.0 : 0.4,
-                    child: IconButton(
-                      icon: Icon(Icons.undo_rounded, color: c.textPrimary),
-                      onPressed: _undoStack.isNotEmpty ? _undo : null,
-                      tooltip: 'Undo',
+                    child: SizedBox(
+                      width: 38,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.undo_rounded, color: c.textPrimary, size: 20),
+                        onPressed: _undoStack.isNotEmpty ? _undo : null,
+                        tooltip: 'Undo',
+                      ),
                     ),
                   ),
                   // Redo Button
                   Opacity(
                     opacity: _redoStack.isNotEmpty ? 1.0 : 0.4,
-                    child: IconButton(
-                      icon: Icon(Icons.redo_rounded, color: c.textPrimary),
-                      onPressed: _redoStack.isNotEmpty ? _redo : null,
-                      tooltip: 'Redo',
+                    child: SizedBox(
+                      width: 38,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(Icons.redo_rounded, color: c.textPrimary, size: 20),
+                        onPressed: _redoStack.isNotEmpty ? _redo : null,
+                        tooltip: 'Redo',
+                      ),
                     ),
                   ),
                   // Pin Toggle
-                  IconButton(
-                    icon: Icon(
-                      _note.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                      color: _note.isPinned ? c.accent : c.textSecondary,
+                  SizedBox(
+                    width: 38,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        _note.isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                        color: _note.isPinned ? c.accent : c.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() => _note.isPinned = !_note.isPinned);
+                        _saveNow();
+                      },
+                      tooltip: 'Pin',
                     ),
-                    onPressed: () {
-                      setState(() => _note.isPinned = !_note.isPinned);
-                      _saveNow();
-                    },
-                    tooltip: 'Pin',
                   ),
                   // Overflow Menu
-                  IconButton(
-                    icon: Icon(Icons.more_vert_rounded, color: c.textPrimary),
-                    onPressed: _showOverflowMenu,
-                    tooltip: 'More options',
+                  SizedBox(
+                    width: 38,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(Icons.more_vert_rounded, color: c.textPrimary, size: 20),
+                      onPressed: _showOverflowMenu,
+                      tooltip: 'More options',
+                    ),
                   ),
+                  const SizedBox(width: 4),
                 ],
               ),
 
