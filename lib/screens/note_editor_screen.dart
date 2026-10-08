@@ -719,9 +719,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                   ),
                 ],
               ),
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
