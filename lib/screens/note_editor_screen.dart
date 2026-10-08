@@ -25,6 +25,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   final List<TextEditingController> _blockControllers = [];
   final List<FocusNode> _blockFocusNodes = [];
 
+  // Provider Reference for Safe Save on Dispose
+  NotesState? _notesState;
+
   // Undo / Redo History Stack
   final List<Note> _undoStack = [];
   final List<Note> _redoStack = [];
@@ -78,6 +81,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _titleController.addListener(_onContentChanged);
 
     _initBlockControllers();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _notesState = context.read<NotesState>();
   }
 
   void _pushHistorySnapshot() {
@@ -164,7 +173,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     if (currentPart.isEmpty && block.text.isEmpty && block.type != NoteBlockType.paragraph) {
       setState(() {
         block.type = NoteBlockType.paragraph;
-        _blockControllers[index].value = const TextEditingValue(text: '');
       });
       _onContentChanged();
       return;
@@ -172,10 +180,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     // Case 2: Normal Enter press in a block (e.g. checklist)
     block.text = currentPart;
-    _blockControllers[index].value = TextEditingValue(
-      text: currentPart,
-      selection: TextSelection.collapsed(offset: currentPart.length),
-    );
 
     final newType = (block.type == NoteBlockType.heading1 || block.type == NoteBlockType.heading2)
         ? NoteBlockType.paragraph
@@ -186,14 +190,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       text: nextPart,
     );
 
-    setState(() {
-      _note.blocks.insert(index + 1, newBlock);
-      _initBlockControllers();
-    });
-
-    _onContentChanged();
-
+    // Defer state update and controller re-initialization to post-frame
+    // so TextEditingController isn't disposed during its own notifyListeners call
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _note.blocks.insert(index + 1, newBlock);
+        _initBlockControllers();
+      });
+      _onContentChanged();
+
       if (index + 1 < _blockFocusNodes.length) {
         _blockFocusNodes[index + 1].requestFocus();
         _blockControllers[index + 1].selection = TextSelection.collapsed(
@@ -282,9 +288,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     });
 
     // Save status
-    setState(() {
-      _saveStatus = 'Saving...';
-    });
+    if (mounted) {
+      setState(() {
+        _saveStatus = 'Saving...';
+      });
+    }
 
     _autosaveTimer?.cancel();
     _autosaveTimer = Timer(const Duration(milliseconds: 500), () {
@@ -293,13 +301,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _saveNow() {
-    if (!mounted) return;
     _note.title = _titleController.text;
 
+    final state = _notesState ?? (mounted ? context.read<NotesState>() : null);
+    if (state == null) return;
+
     if (_note.isEmpty) {
-      context.read<NotesState>().deleteNote(_note.id);
+      state.deleteNote(_note.id);
     } else {
-      context.read<NotesState>().updateNote(_note);
+      state.updateNote(_note);
     }
 
     _savedStatusFadeTimer?.cancel();
@@ -332,11 +342,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _deleteBlockAt(int index) {
     if (_note.blocks.length <= 1) return;
-    setState(() {
-      _note.blocks.removeAt(index);
-      _initBlockControllers();
-    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _note.blocks.removeAt(index);
+        _initBlockControllers();
+      });
+      _onContentChanged();
+
       final target = (index - 1).clamp(0, _blockFocusNodes.length - 1);
       if (target < _blockFocusNodes.length) {
         _blockFocusNodes[target].requestFocus();
