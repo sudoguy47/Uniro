@@ -130,6 +130,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         TaskType.lab => 'Lab / Class',
         TaskType.project => 'Project',
         TaskType.other => 'Other / Lecture',
+        TaskType.custom => 'Custom',
       };
 
   IconData _iconForType(TaskType t) => switch (t) {
@@ -141,6 +142,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         TaskType.lab => Icons.science_outlined,
         TaskType.project => Icons.architecture_outlined,
         TaskType.other => Icons.event_note_outlined,
+        TaskType.custom => Icons.tune_rounded,
       };
 
   @override
@@ -302,51 +304,80 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                   await showModalBottomSheet<TaskType>(
                                 context: context,
                                 backgroundColor: c.cardBg,
+                                isScrollControlled: true,
                                 shape: const RoundedRectangleBorder(
                                   borderRadius: BorderRadius.vertical(
                                       top: Radius.circular(20)),
                                 ),
                                 builder: (ctx) => SafeArea(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Text(
-                                          'Select Task Type',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: c.textPrimary,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight:
+                                          MediaQuery.of(ctx).size.height * 0.72,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 36,
+                                          height: 4,
+                                          margin: const EdgeInsets.only(top: 12),
+                                          decoration: BoxDecoration(
+                                            color: c.border,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
                                           ),
                                         ),
-                                      ),
-                                      ...TaskType.values.map((t) {
-                                        final isCurrent = t == _type;
-                                        return ListTile(
-                                          leading: Icon(_iconForType(t),
-                                              color: isCurrent
-                                                  ? c.accent
-                                                  : c.textSecondary),
-                                          title: Text(
-                                            _formatType(t),
+                                        Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Text(
+                                            'Select Task Type',
                                             style: TextStyle(
-                                              fontWeight: isCurrent
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              color: isCurrent
-                                                  ? c.accent
-                                                  : c.textPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: c.textPrimary,
                                             ),
                                           ),
-                                          trailing: isCurrent
-                                              ? Icon(Icons.check,
-                                                  color: c.accent)
-                                              : null,
-                                          onTap: () => Navigator.pop(ctx, t),
-                                        );
-                                      }),
-                                    ],
+                                        ),
+                                        // Scrollable: 9 types no longer fit on
+                                        // small screens — previously the last
+                                        // rows were clipped off-screen.
+                                        Flexible(
+                                          child: ListView.builder(
+                                            shrinkWrap: true,
+                                            itemCount: TaskType.values.length,
+                                            itemBuilder: (ctx, i) {
+                                              final t = TaskType.values[i];
+                                              final isCurrent = t == _type;
+                                              return ListTile(
+                                                leading: Icon(
+                                                    _iconForType(t),
+                                                    color: isCurrent
+                                                        ? c.accent
+                                                        : c.textSecondary),
+                                                title: Text(
+                                                  _formatType(t),
+                                                  style: TextStyle(
+                                                    fontWeight: isCurrent
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                    color: isCurrent
+                                                        ? c.accent
+                                                        : c.textPrimary,
+                                                  ),
+                                                ),
+                                                trailing: isCurrent
+                                                    ? Icon(Icons.check,
+                                                        color: c.accent)
+                                                    : null,
+                                                onTap: () =>
+                                                    Navigator.pop(ctx, t),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );

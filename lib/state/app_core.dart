@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import '../models/class_routine.dart';
 import '../models/task.dart';
 import '../models/settings.dart';
 import '../services/local_store.dart';
@@ -10,8 +11,12 @@ import '../domain/preloaded_tasks.dart';
 
 mixin AppCore on ChangeNotifier {
   static const _widgetChannel = MethodChannel('com.example.uniro1/widget');
+  // Shared formatters — DateFormat construction parses locale skeletons and
+  // is surprisingly expensive; one static instance serves all calls.
+  static final DateFormat _ymdFmt = DateFormat('yyyy-MM-dd');
   // ── State (RAM) ──────────────────────────────────────────────────────────
   List<Task> _tasks = [];
+  List<ClassRoutineEntry> _routine = [];
   UserSettings _settings = UserSettings.defaults();
   TaskType? _activeFilter; // null = All
   bool _isLoaded = false;
@@ -22,6 +27,7 @@ mixin AppCore on ChangeNotifier {
   List<Task>? _cachedPendingTasks;
   List<Task>? _cachedHeroTasks;
   List<Task>? _cachedCompletedTasks;
+  List<ClassRoutineEntry>? _cachedRoutine;
   final Map<String, Map<String, int>> _cachedWeeklyLoad = {};
 
   void _clearComputedCaches() {
@@ -29,6 +35,7 @@ mixin AppCore on ChangeNotifier {
     _cachedPendingTasks = null;
     _cachedHeroTasks = null;
     _cachedCompletedTasks = null;
+    _cachedRoutine = null;
     _cachedWeeklyLoad.clear();
   }
 
@@ -69,6 +76,8 @@ mixin AppCore on ChangeNotifier {
     _saveDebounce = null;
     LocalStore.instance.save('tasks', _tasks.map((t) => t.toJson()).toList());
     LocalStore.instance.save('settings', _settings.toJson());
+    LocalStore.instance.save(
+        'routine', _routine.map((e) => e.toJson()).toList());
     _widgetChannel.invokeMethod('updateWidget').catchError((_) {});
   }
 
@@ -87,6 +96,12 @@ mixin AppCore on ChangeNotifier {
     final rawSettings = LocalStore.instance.load('settings');
     if (rawSettings != null) {
       _settings = UserSettings.fromJson(Map<String, dynamic>.from(rawSettings as Map));
+    }
+    final rawRoutine = LocalStore.instance.load('routine');
+    if (rawRoutine is List) {
+      _routine = rawRoutine
+          .map((j) => ClassRoutineEntry.fromJson(Map<String, dynamic>.from(j as Map)))
+          .toList();
     }
     _clearComputedCaches();
     _isLoaded = true;
@@ -153,6 +168,43 @@ mixin AppCore on ChangeNotifier {
     _persist();
   }
 
+  // ── Class Routine (dashboard pager page 2) ─────────────────────────────
+  /// Sorted Mon→Sun, then by start time. Unmodifiable snapshot.
+  List<ClassRoutineEntry> get classRoutine {
+    if (_cachedRoutine != null) return _cachedRoutine!;
+    final list = List.of(_routine)
+      ..sort((a, b) {
+        final d = a.dayOfWeek.compareTo(b.dayOfWeek);
+        if (d != 0) return d;
+        return ClassRoutineEntry.minutesOf(a.startTime)
+            .compareTo(ClassRoutineEntry.minutesOf(b.startTime));
+      });
+    return _cachedRoutine = List.unmodifiable(list);
+  }
+
+  void addRoutineEntry(ClassRoutineEntry entry) {
+    _routine.add(entry);
+    _cachedRoutine = null;
+    notifyListeners();
+    _persist();
+  }
+
+  void updateRoutineEntry(String id, ClassRoutineEntry updated) {
+    final i = _routine.indexWhere((e) => e.id == id);
+    if (i < 0) return;
+    _routine[i] = updated;
+    _cachedRoutine = null;
+    notifyListeners();
+    _persist();
+  }
+
+  void deleteRoutineEntry(String id) {
+    _routine.removeWhere((e) => e.id == id);
+    _cachedRoutine = null;
+    notifyListeners();
+    _persist();
+  }
+
   void setFilter(TaskType? filter) {
     if (_activeFilter == filter) return;
     _activeFilter = filter;
@@ -165,6 +217,11 @@ mixin AppCore on ChangeNotifier {
     _settings = s;
     notifyListeners();
     LocalStore.instance.save('settings', s.toJson());
+    // Keep the daily 6 AM greeting in sync with name + toggle.
+    unawaited(NotificationService.instance.scheduleDailyGreeting(
+      name: s.name,
+      enabled: s.notificationsEnabled,
+    ));
   }
 
   // ── Computed (Cached to eliminate Scavenge GC) ───────────────────────────
@@ -197,12 +254,11 @@ mixin AppCore on ChangeNotifier {
     final cached = _cachedWeeklyLoad[weekStart];
     if (cached != null) return cached;
 
-    final fmt = DateFormat('yyyy-MM-dd');
     final start = DateTime.parse(weekStart);
     final map = <String, int>{};
     for (int i = 0; i < 7; i++) {
       final d = start.add(Duration(days: i));
-      final key = fmt.format(d);
+      final key = _ymdFmt.format(d);
       map[key] = _tasks
           .where((t) => t.dueDate == key && t.status == TaskStatus.pending)
           .length;

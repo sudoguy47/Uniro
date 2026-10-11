@@ -28,18 +28,26 @@ class _CalendarScreenState extends State<CalendarScreen>
   late String _selectedDate;
   bool _showNewTask = false;
 
+  // Cached formatters — constructing DateFormat per build parses ICU
+  // skeletons each time (~µs that add up at 120Hz scroll + tab switches).
+  static final _ymdFmt = DateFormat('yyyy-MM-dd');
+  static final _ymFmt = DateFormat('yyyy-MM');
+  static final _monthYearFmt = DateFormat('MMMM yyyy');
+  static final _mmmDFmt = DateFormat('MMM d');
+  static final _mmmDYFmt = DateFormat('MMM d, yyyy');
+
   @override
   void initState() {
     super.initState();
     final today = DateTime.now();
-    _selectedDate = DateFormat('yyyy-MM-dd').format(today);
+    _selectedDate = _ymdFmt.format(today);
   }
 
-  String get _monthStr => DateFormat('yyyy-MM').format(_currentDate);
+  String get _monthStr => _ymFmt.format(_currentDate);
 
   String get _getMondayOfWeek {
     final monday = _currentDate.subtract(Duration(days: _currentDate.weekday - 1));
-    return DateFormat('yyyy-MM-dd').format(monday);
+    return _ymdFmt.format(monday);
   }
 
   @override
@@ -154,8 +162,8 @@ class _CalendarScreenState extends State<CalendarScreen>
                       ),
                       Text(
                         _viewMode == 'monthly'
-                            ? DateFormat('MMMM yyyy').format(_currentDate)
-                            : 'Week of ${DateFormat('MMM d').format(DateTime.parse(_getMondayOfWeek))}',
+                            ? _monthYearFmt.format(_currentDate)
+                            : 'Week of ${_mmmDFmt.format(DateTime.parse(monday))}',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
@@ -202,7 +210,7 @@ class _CalendarScreenState extends State<CalendarScreen>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Tasks for ${DateFormat('MMM d, yyyy').format(DateTime.parse(_selectedDate))}',
+                        'Tasks for ${_mmmDYFmt.format(DateTime.parse(_selectedDate))}',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,

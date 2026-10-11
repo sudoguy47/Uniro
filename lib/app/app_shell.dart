@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../domain/haptics.dart';
 import '../state/app_state.dart';
 import '../state/notes_state.dart';
 import '../theme/app_colors.dart';
@@ -110,7 +110,7 @@ class _SimpleBottomNavBar extends StatelessWidget {
   final AppRoute current;
   final ValueChanged<AppRoute> onTap;
 
-  static const double _barContentHeight = 58.0;
+  static const double _barContentHeight = 68.0;
 
   @override
   Widget build(BuildContext context) {
@@ -147,7 +147,8 @@ class _SimpleBottomNavBar extends StatelessWidget {
             return Expanded(
               child: InkResponse(
                 onTap: () {
-                  HapticFeedback.lightImpact();
+                  // Navbar stays whisper-light: selection click only.
+                  PremiumHaptics.select();
                   onTap(route);
                 },
                 containedInkWell: true,
@@ -158,14 +159,14 @@ class _SimpleBottomNavBar extends StatelessWidget {
                   children: [
                     Icon(
                       isActive ? _fillIcon(route) : _outlineIcon(route),
-                      size: 24,
+                      size: 27,
                       color: isActive ? activeColor : inactiveColor,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       _label(route),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                         color: isActive ? activeColor : inactiveColor,
                         letterSpacing: -0.1,

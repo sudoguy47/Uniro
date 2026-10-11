@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +10,9 @@ import '../widgets/task_card.dart';
 import '../widgets/hero_carousel.dart';
 import '../widgets/weekly_bar_chart.dart';
 import '../widgets/ui_kit.dart';
+import '../domain/greetings.dart';
+import '../widgets/class_routine_page.dart';
+import '../widgets/routine_sheet.dart';
 import '../widgets/new_task_sheet.dart';
 
 /// Highly optimized Dashboard Screen.
@@ -140,17 +145,51 @@ class _DashboardFab extends StatelessWidget {
   }
 }
 
-/// Header Widget - Listens ONLY to specific settings (name, avatarUri) & avoids sync disk I/O.
-class _DashboardHeader extends StatelessWidget {
+/// Header Widget — time-aware greeting + subtitle, with a swipe-up-to-reveal
+/// daily motivation line. Listens ONLY to specific settings (name, avatarUri).
+class _DashboardHeader extends StatefulWidget {
   const _DashboardHeader({this.onNavigateToProfile});
   final VoidCallback? onNavigateToProfile;
 
-  static String get _greeting {
-    final h = DateTime.now().hour;
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    return 'Good evening';
+  @override
+  State<_DashboardHeader> createState() => _DashboardHeaderState();
+}
+
+class _DashboardHeaderState extends State<_DashboardHeader> {
+  bool _showQuote = false;
+  double _dragAccum = 0;
+  Timer? _quoteTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Motivation slides in automatically 3s after the dashboard appears.
+    _quoteTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showQuote = true);
+    });
   }
+
+  @override
+  void dispose() {
+    _quoteTimer?.cancel();
+    super.dispose();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails d) {
+    _dragAccum += d.primaryDelta ?? 0;
+    // Swipe up reveals the quote, swipe down restores the greeting.
+    if (_dragAccum <= -48 && !_showQuote) {
+      _dragAccum = 0;
+      HapticFeedback.selectionClick();
+      setState(() => _showQuote = true);
+    } else if (_dragAccum >= 48 && _showQuote) {
+      _dragAccum = 0;
+      HapticFeedback.selectionClick();
+      setState(() => _showQuote = false);
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails _) => _dragAccum = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +197,16 @@ class _DashboardHeader extends StatelessWidget {
     // Fine-grained selectors isolate rebuilds from unrelated settings changes
     final name = context.select((AppState s) => s.settings.name);
     final avatarUri = context.select((AppState s) => s.settings.avatarUri);
+    final now = DateTime.now();
+    // First name only — full names ("Sreyas Chowhan") overflow one line
+    // and get clipped with "...".
+    final firstName = name.split(' ').firstWhere(
+          (w) => w.trim().isNotEmpty,
+          orElse: () => name,
+        );
+    final greetingHead = greetingHeadline(now);
+    final greetingEmoji = greetingEmojiFor(now);
+    final quote = quoteOfTheDay(now);
 
     return RepaintBoundary(
       child: Container(
@@ -167,35 +216,110 @@ class _DashboardHeader extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _greeting,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: c.textSecondary,
+                  child: GestureDetector(
+                    onVerticalDragUpdate: _onVerticalDragUpdate,
+                    onVerticalDragEnd: _onVerticalDragEnd,
+                    onTap: () {
+                      // Manual toggle cancels the auto-show so it never
+                      // fights the user.
+                      _quoteTimer?.cancel();
+                      setState(() => _showQuote = !_showQuote);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    // Fixed height: greeting ⇄ quote swaps never push the
+                    // content below up/down.
+                    child: SizedBox(
+                      height: 66,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 250),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.25),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: child,
+                          ),
                         ),
+                        child: _showQuote
+                            ? Column(
+                                key: const ValueKey('quote'),
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'DAILY FUEL',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: c.accent,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '\u201C$quote\u201D',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.2,
+                                      color: c.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            // Two-line greeting: time-based head on line 1,
+                            // student name on line 2.
+                            : Align(
+                                key: const ValueKey('greeting'),
+                                alignment: Alignment.centerLeft,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      greetingHead,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.15,
+                                        color: c.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      '$firstName!$greetingEmoji',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w800,
+                                        height: 1.15,
+                                        color: c.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Hi, $name',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: c.textPrimary,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
-                    onNavigateToProfile?.call();
+                    widget.onNavigateToProfile?.call();
                   },
                   behavior: HitTestBehavior.opaque,
                   child: UserAvatar(
@@ -231,14 +355,71 @@ class _HeroSection extends StatelessWidget {
   }
 }
 
-/// Weekly Load Section - Listens ONLY to weeklyLoad & pendingTasks count
-class _WeeklyLoadSection extends StatelessWidget {
+/// Swipeable Dashboard pager: page 1 = Weekly Load chart (unchanged UI),
+/// page 2 = Class Routine. Manual drag + 5s auto-cycle (pauses 4s after a
+/// manual swipe). Dots match the hero carousel style.
+class _WeeklyLoadSection extends StatefulWidget {
   const _WeeklyLoadSection();
+
+  @override
+  State<_WeeklyLoadSection> createState() => _WeeklyLoadSectionState();
+}
+
+class _WeeklyLoadSectionState extends State<_WeeklyLoadSection> {
+  late final PageController _pageCtrl;
+  int _page = 0;
+  Timer? _cycleTimer;
+  Timer? _resumeTimer;
+
+  static const _autoCycle = Duration(seconds: 5);
+  static const _resumeDelay = Duration(seconds: 4);
 
   static String get _mondayOfWeek {
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
     return '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController();
+    _startCycle();
+  }
+
+  @override
+  void dispose() {
+    _cycleTimer?.cancel();
+    _resumeTimer?.cancel();
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  void _startCycle() {
+    _cycleTimer?.cancel();
+    _resumeTimer?.cancel();
+    if (!mounted) return;
+    _cycleTimer = Timer.periodic(_autoCycle, (_) {
+      if (!mounted || !_pageCtrl.hasClients) return;
+      final p = _pageCtrl.page;
+      // Never fight the user's finger mid-drag.
+      if (p != null && (p - p.round()).abs() > 0.05) return;
+      _pageCtrl.animateToPage(
+        (_page + 1) % 2,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  void _onPageChanged(int index) {
+    if (_page == index) return;
+    setState(() => _page = index);
+    _cycleTimer?.cancel();
+    _resumeTimer?.cancel();
+    _resumeTimer = Timer(_resumeDelay, () {
+      if (mounted) _startCycle();
+    });
   }
 
   @override
@@ -248,42 +429,83 @@ class _WeeklyLoadSection extends StatelessWidget {
     final weeklyLoad = context.select((AppState s) => s.weeklyLoad(monday));
     final pendingCount =
         context.select((AppState s) => s.pendingTasks.length);
+    final routine = context.select((AppState s) => s.classRoutine);
 
     return RepaintBoundary(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          SizedBox(
+            height: 330,
+            child: PageView(
+              controller: _pageCtrl,
+              onPageChanged: _onPageChanged,
               children: [
-                Text(
-                  'Weekly load',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary,
-                  ),
+                // Page 1 — Weekly Load (existing UI, untouched).
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Weekly load',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '$pendingCount due this week',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: WeeklyBarChart(
+                        weekStart: monday,
+                        load: weeklyLoad,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '$pendingCount due this week',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: c.textSecondary,
+                // Page 2 — Class Routine.
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                  child: ClassRoutinePage(
+                    entries: routine,
+                    onAdd: () => showRoutineSheet(context),
+                    onEdit: (e) => showRoutineSheet(context, e),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: WeeklyBarChart(
-              weekStart: monday,
-              load: weeklyLoad,
-            ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(2, (i) {
+              final active = i == _page;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 16 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: active ? c.accent : c.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              );
+            }),
           ),
         ],
       ),

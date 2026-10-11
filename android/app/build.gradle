@@ -25,6 +25,42 @@ android {
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode
         versionName flutter.versionName
+
+        // NOTE: no ndk abiFilters here on purpose — per-ABI filtering is done
+        // by the splits block below. An abiFilters entry would strip .so
+        // files out of the OTHER splits too, producing broken APKs.
+        // Only English resources — strips translated strings/drawables that
+        // every plugin bundles for locales the app never uses.
+        resConfigs 'en'
+    }
+
+    // NOTE: no `splits { abi { ... } }` block on purpose — ABI splits are
+    // incompatible with shrinkResources when building an App Bundle
+    // ("Multiple shrunk-resources files" failure). Play gets per-device
+    // size savings from the `bundle` splits below instead, and sideloaders
+    // use the per-ABI APKs Flutter already emits (app-arm64-v8a-release.apk).
+    bundle {
+        abi {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        language {
+            enableSplit = true
+        }
+    }
+
+    packaging {
+        resources {
+            excludes += 'META-INF/DEPENDENCIES'
+            excludes += 'META-INF/LICENSE'
+            excludes += 'META-INF/LICENSE.txt'
+            excludes += 'META-INF/NOTICE'
+            excludes += 'META-INF/NOTICE.txt'
+            excludes += 'META-INF/*.kotlin_module'
+            excludes += 'DebugProbesKt.bin'
+        }
     }
 
     buildTypes {

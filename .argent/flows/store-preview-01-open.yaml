@@ -1,0 +1,10 @@
+# Preview seg 1: cold start (goldie restarts the app, data cleared) → past
+# onboarding → settled dashboard.
+executionPrerequisite: >-
+  App freshly restarted by goldie with cleared data, settled on onboarding slide 1.
+steps:
+  - await: { visible: { text: Skip } }
+  - wait: 1200
+  - tap: { text: Skip }
+  - await: { visible: { text: "Weekly load" } }
+  - wait: 1200

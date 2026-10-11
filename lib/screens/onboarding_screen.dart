@@ -1,17 +1,16 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import '../app/app_shell.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import '../state/app_state.dart';
+import '../widgets/onboarding_mascots.dart';
 
-/// Renders uniro_splash_onboarding.html inside WebView on mobile devices
-/// and provides a clean native onboarding experience on Flutter Web.
+/// Native Uniro onboarding matching the brand mocks:
+/// orange grad → blue calendar → green name → purple reminders.
+/// Mascots are animated CustomPainters (bob + blink + swing) — no assets,
+/// no new dependencies, 60/120fps on a single small repaint layer.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -20,127 +19,45 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  WebViewController? _webController;
-  final ImagePicker _picker = ImagePicker();
-  String? _pickedAvatarPath;
-  Color _currentBgColor = const Color(0xFFD5803B);
-
-  // Web Fallback Controller State
-  final PageController _webPageController = PageController();
+  final PageController _pageController = PageController();
   final TextEditingController _nameController = TextEditingController();
-  int _webCurrentPage = 0;
+  int _currentPage = 0;
+  bool _notificationsEnabled = false;
 
-  @override
-  void initState() {
-    super.initState();
-    if (!kIsWeb) {
-      _webController = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0xFFD5803B))
-        ..addJavaScriptChannel(
-          'FlutterChannel',
-          onMessageReceived: (JavaScriptMessage message) {
-            _handleJavaScriptMessage(message.message);
-          },
-        )
-        ..loadFlutterAsset('uniro_splash_onboarding.html');
-    }
-  }
+  static const _slideColors = [
+    Color(0xFFD97E36), // grad
+    Color(0xFF3E6FA8), // calendar
+    Color(0xFF4C7A5B), // name
+    Color(0xFF8B5E9E), // reminders
+  ];
 
   @override
   void dispose() {
-    _webPageController.dispose();
+    _pageController.dispose();
     _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleJavaScriptMessage(String rawMessage) async {
-    try {
-      final json = jsonDecode(rawMessage) as Map<String, dynamic>;
-      final action = json['action'] as String?;
-
-      if (action == 'slideChange') {
-        final colorHex = json['color'] as String?;
-        if (colorHex != null && mounted) {
-          final colorVal = int.parse(colorHex.replaceFirst('#', '0xFF'));
-          setState(() {
-            _currentBgColor = Color(colorVal);
-          });
-          SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.light,
-            statusBarBrightness: Brightness.dark,
-          ));
-        }
-      } else if (action == 'pickAvatar') {
-        await _pickAvatar();
-      } else if (action == 'requestNotifications') {
-        await _requestNotifications();
-      } else if (action == 'finish') {
-        final name = json['name'] as String? ?? 'Student';
-        final notificationsEnabled =
-            json['notificationsEnabled'] as bool? ?? false;
-        await _finishOnboarding(
-          name: name,
-          avatarUri: _pickedAvatarPath,
-          notificationsEnabled: notificationsEnabled,
-        );
-      }
-    } catch (e) {
-      debugPrint('JS channel message notice: $e');
-    }
-  }
-
-  Future<void> _pickAvatar() async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-        maxHeight: 512,
-        imageQuality: 80,
-      );
-      if (image != null && mounted) {
-        _pickedAvatarPath = image.path;
-        final pathEscaped = image.path.replaceAll(r'\', r'\\');
-        if (_webController != null) {
-          _webController!.runJavaScript('setAvatarPreview("file://$pathEscaped");');
-        }
-      }
-    } catch (e) {
-      debugPrint('Avatar pick notice: $e');
-    }
-  }
-
   Future<void> _requestNotifications() async {
-    final granted =
-        await NotificationService.instance.requestPermissions();
-    if (mounted && _webController != null) {
-      _webController!.runJavaScript('setNotifStatus($granted);');
-    }
+    final granted = await NotificationService.instance.requestPermissions();
+    if (mounted) setState(() => _notificationsEnabled = granted);
   }
 
-  Future<void> _finishOnboarding({
-    required String name,
-    required String? avatarUri,
-    required bool notificationsEnabled,
-  }) async {
+  Future<void> _finishOnboarding() async {
     final app = context.read<AppState>();
+    final name = _nameController.text.trim();
 
-    // 1. Update settings with real inputs
     app.updateSettings(
       app.settings.copyWith(
         name: name.isNotEmpty ? name : 'Student',
-        avatarUri: avatarUri,
-        notificationsEnabled: notificationsEnabled,
+        notificationsEnabled: _notificationsEnabled,
       ),
     );
 
-    // 2. Mark onboarding done
     LocalStore.instance.setOnboardingDone(true);
 
     if (!mounted) return;
 
-    // 3. Navigate directly to AppShell
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         pageBuilder: (context, anim, secAnim) => const AppShell(),
@@ -151,257 +68,441 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return _buildWebOnboarding(context);
+  void _next() {
+    if (_currentPage < 3) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      _finishOnboarding();
     }
-
-    return Scaffold(
-      backgroundColor: _currentBgColor,
-      body: WebViewWidget(controller: _webController!),
-    );
   }
 
-  Widget _buildWebOnboarding(BuildContext context) {
-    final slideColors = [
-      const Color(0xFFD5803B),
-      const Color(0xFF3B6EA5),
-      const Color(0xFF4A7C59),
-      const Color(0xFF8B5E9E),
-    ];
-
-    return Scaffold(
-      backgroundColor: slideColors[_webCurrentPage],
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      color: _slideColors[_currentPage],
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Brand
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(28, 18, 28, 0),
+                  child: Text(
                     'Uniro',
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 27,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
+                      letterSpacing: -0.5,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => _finishOnboarding(
-                      name: 'Student',
-                      avatarUri: null,
-                      notificationsEnabled: false,
-                    ),
-                    style: TextButton.styleFrom(
-                      backgroundColor: Colors.white24,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+
+              // Slides
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (page) {
+                    setState(() => _currentPage = page);
+                    SystemChrome.setSystemUIOverlayStyle(
+                      const SystemUiOverlayStyle(
+                        statusBarColor: Colors.transparent,
+                        statusBarIconBrightness: Brightness.light,
+                        statusBarBrightness: Brightness.dark,
                       ),
+                    );
+                  },
+                  children: [
+                    const _MascotSlide(
+                      mascot: GradMascot(),
+                      title: 'GET YOUR\nCAMPUS TASKS\nDONE.',
+                      sub: 'Stay on top of every deadline,\nstress-free.',
                     ),
-                    child: const Text('Skip'),
-                  ),
-                ],
+                    const _MascotSlide(
+                      mascot: CalendarMascot(),
+                      title: 'NEVER MISS\nA DEADLINE\nAGAIN.',
+                      sub: 'Visual calendar keeps every\ndue date in one place.',
+                    ),
+                    _NameSlide(controller: _nameController),
+                    _ReminderSlide(
+                      enabled: _notificationsEnabled,
+                      onEnable: _requestNotifications,
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            // Page View
-            Expanded(
-              child: PageView(
-                controller: _webPageController,
-                onPageChanged: (page) {
-                  setState(() => _webCurrentPage = page);
-                },
-                children: [
-                  _buildWebSlide(
-                    title: 'GET YOUR\nCAMPUS TASKS\nDONE.',
-                    sub: 'Stay on top of every deadline, stress-free.',
-                    icon: Icons.school_rounded,
-                  ),
-                  _buildWebSlide(
-                    title: 'NEVER MISS\nA DEADLINE\nAGAIN.',
-                    sub: 'Visual calendar keeps every due date in one place.',
-                    icon: Icons.calendar_month_rounded,
-                  ),
-                  _buildWebNameSlide(),
-                  _buildWebNotifSlide(),
-                ],
+              // Dots
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 0, 28, 6),
+                child: Row(
+                  children: List.generate(4, (i) {
+                    final active = i == _currentPage;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 7),
+                      width: active ? 22 : 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: active ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    );
+                  }),
+                ),
               ),
-            ),
 
-            // Bottom Navigation
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (_webCurrentPage > 0)
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        _webPageController.previousPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white24,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+              // Bottom bar: Skip | Next + arrow
+              Padding(
+                padding: const EdgeInsets.fromLTRB(28, 10, 28, 26),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: _finishOnboarding,
+                      behavior: HitTestBehavior.opaque,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'Skip',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white70,
+                          ),
                         ),
                       ),
-                      icon: const Icon(Icons.arrow_back, size: 16),
-                      label: const Text('Back'),
-                    )
-                  else
-                    const SizedBox.shrink(),
-
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_webCurrentPage < 3) {
-                        _webPageController.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      } else {
-                        _finishOnboarding(
-                          name: _nameController.text.trim(),
-                          avatarUri: _pickedAvatarPath,
-                          notificationsEnabled: true,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+                    ),
+                    GestureDetector(
+                      onTap: _next,
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        children: [
+                          Text(
+                            _currentPage == 3 ? "Let's Start" : 'Next',
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withValues(alpha: 0.18),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.65),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Colors.white,
+                              size: 26,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Text(
-                      _webCurrentPage == 3 ? 'Get Started' : 'Next',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildWebSlide({
-    required String title,
-    required String sub,
-    required IconData icon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 100, color: Colors.white),
-          const SizedBox(height: 32),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              height: 1.1,
+/// Slides 1–2: mascot in a lighter circle + headline + sub.
+class _MascotSlide extends StatelessWidget {
+  const _MascotSlide({
+    required this.mascot,
+    required this.title,
+    required this.sub,
+  });
+
+  final Widget mascot;
+  final String title;
+  final String sub;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        // Mascot stage: lighter circle backdrop
+        Container(
+          width: 290,
+          height: 290,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.16),
+          ),
+          alignment: Alignment.center,
+          child: SizedBox(width: 200, height: 215, child: mascot),
+        ),
+        const Spacer(),
+        // Copy
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 33,
+                    height: 1.04,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  sub,
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    height: 1.4,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            sub,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white70,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 26),
+      ],
     );
   }
+}
 
-  Widget _buildWebNameSlide() {
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'WHAT\'S YOUR NAME?',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
+/// Slide 3: name input with floating doodles (no mascot circle, per mock).
+class _NameSlide extends StatelessWidget {
+  const _NameSlide({required this.controller});
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        // Floating doodles at the edges, like the mock
+        const Positioned(
+          top: 6,
+          left: 18,
+          child: Opacity(
+            opacity: 0.55,
+            child: DoodleFloater(
+              phase: 0,
+              child: PencilDoodle(),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'We\'ll personalise your experience.',
-            style: TextStyle(fontSize: 14, color: Colors.white70),
+        ),
+        const Positioned(
+          top: 150,
+          left: 34,
+          child: Opacity(
+            opacity: 0.5,
+            child: DoodleFloater(
+              phase: 2.1,
+              periodMs: 3800,
+              child: MiniCapDoodle(),
+            ),
           ),
-          const SizedBox(height: 32),
-          TextField(
-            controller: _nameController,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              hintText: 'Enter your name…',
-              hintStyle: const TextStyle(color: Colors.white54),
-              filled: true,
-              fillColor: Colors.white24,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+        ),
+        const Positioned(
+          bottom: 40,
+          right: 26,
+          child: Opacity(
+            opacity: 0.55,
+            child: DoodleFloater(
+              phase: 4.2,
+              periodMs: 2900,
+              child: BooksDoodle(),
+            ),
+          ),
+        ),
+        // Copy + input
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 72),
+              const Text(
+                "WHAT'S\nYOUR\nNAME?",
+                style: TextStyle(
+                  fontSize: 33,
+                  height: 1.04,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                "We'll personalise your experience.",
+                style: TextStyle(
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(height: 30),
+              TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.words,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Enter your name...',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.person_outline_rounded,
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.18),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      width: 1.5,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildWebNotifSlide() {
-    return const Padding(
-      padding: EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.notifications_active_rounded,
-              size: 100, color: Colors.white),
-          SizedBox(height: 32),
-          Text(
-            'GET REMINDERS\nBEFORE IT\'S TOO LATE.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
+/// Slide 4: bell mascot + enable-reminders CTA.
+class _ReminderSlide extends StatelessWidget {
+  const _ReminderSlide({required this.enabled, required this.onEnable});
+
+  final bool enabled;
+  final VoidCallback onEnable;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 290,
+          height: 290,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.16),
+          ),
+          alignment: Alignment.center,
+          child: const SizedBox(width: 200, height: 215, child: BellMascot()),
+        ),
+        const Spacer(),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'GET REMINDERS\nBEFORE IT\'S\nTOO LATE.',
+                  style: TextStyle(
+                    fontSize: 33,
+                    height: 1.04,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Smart alerts keep you ahead.',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                GestureDetector(
+                  onTap: onEnable,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 13),
+                    decoration: BoxDecoration(
+                      color: enabled
+                          ? Colors.white.withValues(alpha: 0.18)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          enabled
+                              ? Icons.check_circle_rounded
+                              : Icons.notifications_outlined,
+                          size: 20,
+                          color: enabled ? Colors.white : const Color(0xFF8B5E9E),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          enabled ? 'Reminders On' : 'Enable Reminders',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: enabled
+                                ? Colors.white
+                                : const Color(0xFF8B5E9E),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 12),
-          Text(
-            'Smart alerts keep you ahead.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.white70),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 26),
+      ],
     );
   }
 }

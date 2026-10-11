@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../domain/haptics.dart';
 import '../models/settings.dart';
 import '../screens/onboarding_screen.dart';
 import '../state/app_state.dart';
@@ -37,6 +38,10 @@ class CampusTrackerApp extends StatelessWidget {
       theme: AppTheme.build(colors, Brightness.light),
       darkTheme: AppTheme.build(AppColors.dark, Brightness.dark),
       themeMode: themeMode,
+      // Global edge-haptic layer: every scrollable in the app (lists,
+      // pagers, sheets) thocks once per boundary-hit gesture.
+      builder: (context, child) =>
+          BoundaryHaptics(child: child ?? const SizedBox.shrink()),
       home: showOnboarding ? const OnboardingScreen() : const AppShell(),
     );
   }

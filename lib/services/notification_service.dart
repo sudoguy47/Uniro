@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/data/latest_10y.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import '../domain/greetings.dart';
 import '../models/task.dart';
 
 class NotificationService {
@@ -57,17 +58,15 @@ class NotificationService {
       },
     );
 
-    // Request permissions and create notification channel for Android 12/13/14+
+    // Create the notification channel. Permissions are NEVER requested here —
+    // init runs on every cold start and a surprise system dialog on top of
+    // onboarding is both ugly and store-screenshot poison. Permission is
+    // requested only from explicit user actions: the onboarding
+    // "Enable Reminders" button and the Profile notifications toggle
+    // (see requestPermissions).
     final androidImpl = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidImpl != null) {
-      try {
-        await androidImpl.requestNotificationsPermission();
-        await androidImpl.requestExactAlarmsPermission();
-      } catch (e) {
-        debugPrint('Android notification permission request notice: $e');
-      }
-
       const androidChannel = AndroidNotificationChannel(
         channelId,
         channelName,
@@ -86,6 +85,8 @@ class NotificationService {
   /// Requests notification and exact alarm permissions (Android 13+ & iOS).
   Future<bool> requestPermissions() async {
     if (kIsWeb) return false;
+    // TEMP-DIAG: find who calls this at startup. Remove after diagnosis.
+    debugPrint('DIAG requestPermissions called\n${StackTrace.current}');
     try {
       if (!_initialized) await init();
       final androidImpl = _notifications.resolvePlatformSpecificImplementation<
@@ -266,6 +267,61 @@ class NotificationService {
   Future<void> cancelAll() async {
     if (kIsWeb || !_initialized) return;
     await _notifications.cancelAll();
+  }
+
+  /// Daily 6:00 AM greeting + life motivation. Uses a stable id so every
+  /// re-schedule overwrites the previous one instead of stacking. Repeats
+  /// daily via [DateTimeComponents.time]; re-armed on every app start
+  /// (covers reboots) and whenever the name / toggle changes.
+  Future<void> scheduleDailyGreeting({
+    required String name,
+    required bool enabled,
+  }) async {
+    if (kIsWeb) return;
+    if (!_initialized) await init();
+    const id = 900001;
+    try {
+      if (!enabled) {
+        await _notifications.cancel(id);
+        return;
+      }
+      final now = DateTime.now();
+      var next = DateTime(now.year, now.month, now.day, 6, 0);
+      if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
+
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+
+      await _notifications.zonedSchedule(
+        id,
+        'Rise and shine, $name! \u2600\uFE0F',
+        lifeQuoteOfTheDay(now),
+        tz.TZDateTime.from(next, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'daily_greeting',
+      );
+    } catch (e) {
+      debugPrint('scheduleDailyGreeting notice: $e');
+    }
   }
 
   /// Shows an instant notification immediately (useful for testing & confirmation).

@@ -1,6 +1,6 @@
-import 'package:uuid/uuid.dart';
+import '../domain/ids.dart';
 
-enum TaskType { assignment, exam, ct, viva, presentation, lab, project, other }
+enum TaskType { assignment, exam, ct, viva, presentation, lab, project, other, custom }
 enum TaskPriority { high, medium, low }
 enum TaskStatus { pending, completed }
 enum ReminderType { atTime, oneHour, oneDay, threeDays, oneWeek, custom }
@@ -16,7 +16,7 @@ class Reminder {
     required this.type,
     this.customDays,
     this.notificationId,
-  }) : id = id ?? const Uuid().v4();
+  }) : id = id ?? newLocalId();
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -60,7 +60,7 @@ class Task {
     this.reminders = const [],
     String? createdAt,
     this.completedAt,
-  })  : id = id ?? const Uuid().v4(),
+  })  : id = id ?? newLocalId(),
         createdAt = createdAt ?? DateTime.now().toIso8601String();
 
   Task copyWith({

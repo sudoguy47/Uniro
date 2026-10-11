@@ -64,4 +64,5 @@ IconData iconForTaskType(TaskType t) => switch (t) {
       TaskType.lab => Icons.science_outlined,
       TaskType.project => Icons.architecture_outlined,
       TaskType.other => Icons.event_note_outlined,
+      TaskType.custom => Icons.tune_rounded,
     };

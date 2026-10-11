@@ -1,0 +1,14 @@
+# Preview seg 2: open the sheet and type a title.
+executionPrerequisite: >-
+  Settled on the dashboard (previous segment ended there).
+steps:
+  - echo: Tap the dashboard FAB (bottom-right + button) to open New Task
+  - tap: { x: 0.893, y: 0.800 }
+  - await: { visible: { text: "New Task" } }
+  - wait: 600
+  # TITLE field inside the sheet, below the TITLE label.
+  - echo: Tap the title field in the New Task sheet
+  - tap: { x: 0.5, y: 0.30 }
+  - tool: keyboard
+    args: { text: "AI & Ethics Presentation" }
+  - wait: 800

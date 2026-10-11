@@ -272,8 +272,16 @@ class _ProfileScreenState extends State<ProfileScreen>
                             if (!enabled) {
                               NotificationService.instance.cancelAll();
                             } else {
+                              // Explicit user action: prompt for permission,
+                              // then (re)arm everything if granted.
                               NotificationService.instance
-                                  .rescheduleAll(appState.tasks);
+                                  .requestPermissions()
+                                  .then((granted) {
+                                if (granted) {
+                                  NotificationService.instance
+                                      .rescheduleAll(appState.tasks);
+                                }
+                              });
                             }
                           },
                         ),

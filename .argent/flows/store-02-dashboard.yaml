@@ -1,0 +1,8 @@
+# Scene 2: dashboard with seeded tasks (fresh install seeds 14 tasks).
+steps:
+  - launch: com.example.uniro1
+  - await: { visible: { text: Skip } }
+  - tap: { text: Skip }
+  - await: { visible: { text: "Weekly load" } }
+  - wait: 1000
+  - await: { idle: true }

@@ -242,7 +242,11 @@ class _RenderStretchEffect extends RenderProxyBox {
   }
 
   @override
-  bool get alwaysNeedsCompositing => true;
+  // Only force a compositing layer while an overscroll stretch is active.
+  // (Was unconditionally true — every scroll frame paid for an offscreen
+  // buffer even when the shader was bypassed.)
+  bool get alwaysNeedsCompositing =>
+      _overscrollX.abs() > 0.001 || _overscrollY.abs() > 0.001;
 
   @override
   void paint(PaintingContext context, Offset offset) {
