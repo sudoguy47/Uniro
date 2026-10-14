@@ -177,7 +177,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
 
-              // Bottom bar: Skip | Next + arrow
+              // Bottom bar: Skip | Next + arrow. The action group
+              // shrink-fits so "Let's Start" can never push past 320dp
+              // at large text scales.
               Padding(
                 padding: const EdgeInsets.fromLTRB(28, 10, 28, 26),
                 child: Row(
@@ -198,38 +200,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                     ),
-                    GestureDetector(
-                      onTap: _next,
-                      behavior: HitTestBehavior.opaque,
-                      child: Row(
-                        children: [
-                          Text(
-                            _currentPage == 3 ? "Let's Start" : 'Next',
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: _next,
+                            behavior: HitTestBehavior.opaque,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _currentPage == 3 ? "Let's Start" : 'Next',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Container(
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white
+                                        .withValues(alpha: 0.18),
+                                    border: Border.all(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.65),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Container(
-                            width: 54,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.18),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.65),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.arrow_forward_rounded,
-                              color: Colors.white,
-                              size: 26,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
@@ -257,56 +272,76 @@ class _MascotSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        // Mascot stage: lighter circle backdrop
-        Container(
-          width: 290,
-          height: 290,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.16),
-          ),
-          alignment: Alignment.center,
-          child: SizedBox(width: 200, height: 215, child: mascot),
-        ),
-        const Spacer(),
-        // Copy
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 33,
-                    height: 1.04,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
+    return LayoutBuilder(builder: (context, cons) {
+      // Narrow phones wrap the 33px caps lines (designed at 390dp), so
+      // drop to 29px under 360dp to keep the intended 3-line shape.
+      final titleSize = cons.maxWidth < 360 ? 29.0 : 33.0;
+      return Column(
+        children: [
+          const SizedBox(height: 8),
+          // Mascot stage: lighter circle backdrop. Shrinks (never grows) on
+          // short screens so the copy below can never be pushed off.
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Container(
+                  width: 290,
+                  height: 290,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.16),
                   ),
+                  alignment: Alignment.center,
+                  child: SizedBox(width: 200, height: 215, child: mascot),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  sub,
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    height: 1.4,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 26),
-      ],
-    );
+          const Spacer(),
+          // Copy keeps its natural size (identical look), but caps at its
+          // flex share and scrolls instead of overflowing at extremes.
+          Flexible(
+            flex: 2,
+            child: SingleChildScrollView(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: titleSize,
+                          height: 1.04,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        sub,
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 26),
+        ],
+      );
+    });
   }
 }
 
@@ -433,93 +468,121 @@ class _ReminderSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 290,
-          height: 290,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.16),
-          ),
-          alignment: Alignment.center,
-          child: const SizedBox(width: 200, height: 215, child: BellMascot()),
-        ),
-        const Spacer(),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'GET REMINDERS\nBEFORE IT\'S\nTOO LATE.',
-                  style: TextStyle(
-                    fontSize: 33,
-                    height: 1.04,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
+    return LayoutBuilder(builder: (context, cons) {
+      final titleSize = cons.maxWidth < 360 ? 29.0 : 33.0;
+      return Column(
+        children: [
+          const SizedBox(height: 8),
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Container(
+                  width: 290,
+                  height: 290,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.16),
                   ),
+                  alignment: Alignment.center,
+                  child: const SizedBox(
+                      width: 200, height: 215, child: BellMascot()),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  'Smart alerts keep you ahead.',
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.85),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                GestureDetector(
-                  onTap: onEnable,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 13),
-                    decoration: BoxDecoration(
-                      color: enabled
-                          ? Colors.white.withValues(alpha: 0.18)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          enabled
-                              ? Icons.check_circle_rounded
-                              : Icons.notifications_outlined,
-                          size: 20,
-                          color: enabled ? Colors.white : const Color(0xFF8B5E9E),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          enabled ? 'Reminders On' : 'Enable Reminders',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 15,
-                            color: enabled
-                                ? Colors.white
-                                : const Color(0xFF8B5E9E),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 26),
-      ],
-    );
+          const Spacer(),
+          Flexible(
+            flex: 3,
+            child: SingleChildScrollView(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'GET REMINDERS\nBEFORE IT\'S\nTOO LATE.',
+                        style: TextStyle(
+                          fontSize: titleSize,
+                          height: 1.04,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Smart alerts keep you ahead.',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: GestureDetector(
+                            onTap: onEnable,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 13),
+                              decoration: BoxDecoration(
+                                color: enabled
+                                    ? Colors.white.withValues(alpha: 0.18)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.65),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    enabled
+                                        ? Icons.check_circle_rounded
+                                        : Icons.notifications_outlined,
+                                    size: 20,
+                                    color: enabled
+                                        ? Colors.white
+                                        : const Color(0xFF8B5E9E),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    enabled
+                                        ? 'Reminders On'
+                                        : 'Enable Reminders',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: enabled
+                                          ? Colors.white
+                                          : const Color(0xFF8B5E9E),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 26),
+        ],
+      );
+    });
   }
 }

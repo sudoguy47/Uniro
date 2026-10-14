@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../domain/haptics.dart';
 
 class FloatingNotePill extends StatelessWidget {
   const FloatingNotePill({
@@ -16,26 +16,33 @@ class FloatingNotePill extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: cs.primary,
-          borderRadius: BorderRadius.circular(999),
-          boxShadow: [
-            BoxShadow(
-              color: cs.primary.withValues(alpha: 0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
+      child: ConstrainedBox(
+        // Cap the hug-width pill well inside 320dp; shrink-fit instead of
+        // overflowing at large text scales.
+        constraints: const BoxConstraints(maxWidth: 280),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.primary,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.primary.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
           children: [
             InkWell(
               borderRadius: BorderRadius.circular(999),
               onTap: () {
-                HapticFeedback.lightImpact();
+                PremiumHaptics.tap();
                 onNewNote();
               },
               child: Padding(
@@ -79,12 +86,14 @@ class FloatingNotePill extends StatelessWidget {
                 color: cs.onPrimary,
               ),
               onPressed: () {
-                HapticFeedback.lightImpact();
+                PremiumHaptics.tap();
                 onNewChecklist();
               },
               tooltip: 'New Checklist',
             ),
           ],
+        ),
+          ),
         ),
       ),
     );

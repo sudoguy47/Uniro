@@ -13,6 +13,13 @@ class CampusTrackerApp extends StatelessWidget {
 
   final bool showOnboarding;
 
+  /// System text-size accessibility is honored but clamped: below 1.0 text
+  /// must never shrink (legibility floor), above 1.3 layouts are verified
+  /// (see test/responsive_test.dart) but full-bleed 2.0x would break
+  /// fixed-height cards, so it is capped.
+  static const double kMinTextScale = 1.0;
+  static const double kMaxTextScale = 1.3;
+
   /// Global navigator key so non-widget code (e.g. the OTA update checker in
   /// main.dart) can present dialogs/bottom sheets over the app.
   static final GlobalKey<NavigatorState> navigatorKey =
@@ -40,8 +47,17 @@ class CampusTrackerApp extends StatelessWidget {
       themeMode: themeMode,
       // Global edge-haptic layer: every scrollable in the app (lists,
       // pagers, sheets) thocks once per boundary-hit gesture.
-      builder: (context, child) =>
-          BoundaryHaptics(child: child ?? const SizedBox.shrink()),
+      // Text scale is clamped here so every screen inherits the cap.
+      builder: (context, child) {
+        final base = MediaQuery.textScalerOf(context).clamp(
+              minScaleFactor: kMinTextScale,
+              maxScaleFactor: kMaxTextScale,
+            );
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: base),
+          child: BoundaryHaptics(child: child ?? const SizedBox.shrink()),
+        );
+      },
       home: showOnboarding
           ? const OnboardingScreen()
           : AppShell(key: AppShell.shellKey),

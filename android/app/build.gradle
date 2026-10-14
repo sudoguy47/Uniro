@@ -4,6 +4,15 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// Release signing: reads android/key.properties (see KEYSTORE.md).
+// Absent file (fresh clone, CI without secrets) → release falls back to
+// the debug key so anyone can still build; NEVER commit key.properties.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.example.uniro1"
     compileSdk flutter.compileSdkVersion
@@ -14,7 +23,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = '17'
     }
@@ -31,6 +39,11 @@ android {
         // files out of the OTHER splits too, producing broken APKs.
         // Only English resources — strips translated strings/drawables that
         // every plugin bundles for locales the app never uses.
+        // Audited 2026-10: the app hardcodes all UI strings in English,
+        // declares no localizationsDelegates/supportedLocales, and uses
+        // intl for DateFormat only (default 'en' locale, never awaited).
+        // So keeping this LOSES nothing and saves APK size. Do not remove
+        // unless real multi-locale support lands.
         resConfigs 'en'
     }
 
@@ -63,9 +76,30 @@ android {
         }
     }
 
+    signingConfigs {
+        // Populated from android/key.properties only when the file exists
+        // (see KEYSTORE.md). Contributors without the file simply never
+        // reference this config (see buildTypes below).
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties['storeFile'])
+                storePassword = keystoreProperties['storePassword']
+                keyAlias = keystoreProperties['keyAlias']
+                keyPassword = keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            // Signed with the release key when android/key.properties exists,
+            // otherwise with the debug key (local/dev builds only — never
+            // ship a debug-signed APK to testers or GitHub Releases, and
+            // never change keys between updates: same key or users cannot
+            // update, including via the in-app OTA flow).
+            signingConfig keystorePropertiesFile.exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
