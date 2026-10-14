@@ -1,0 +1,13 @@
+# Scene 3: New Task bottom sheet open on the dashboard.
+steps:
+  - launch: com.example.uniro1
+  - await: { visible: { text: Skip } }
+  - tap: { text: Skip }
+  - await: { visible: { text: "Weekly load" } }
+  # Dashboard FAB: 56dp circle, bottom-right (right:16, bottom:~96+inset).
+  # Coordinates to verify against a real capture; refine if the tap misses.
+  - echo: Tap the dashboard FAB (bottom-right + button) to open New Task
+  - tap: { x: 0.893, y: 0.800 }
+  - await: { visible: { text: "New Task" } }
+  - wait: 600
+  - await: { idle: true }

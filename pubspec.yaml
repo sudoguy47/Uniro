@@ -15,15 +15,10 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
   intl: ^0.20.2
-  uuid: ^4.4.0
   image_picker: ^1.1.2
-  path_provider: ^2.1.4
-  http: ^1.2.0
-  package_info_plus: ^8.0.0
-  open_filex: ^4.3.4
-  permission_handler: ^11.3.0
-  webview_flutter: ^4.10.0
-  webview_flutter_web: ^0.2.3
+  http: ^1.6.0
+  package_info_plus: ^8.3.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -32,7 +27,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - uniro_splash_onboarding.html
-  shaders:
-    - shaders/stretch_effect.frag

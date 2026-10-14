@@ -1,215 +1,153 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
-/// Self-hosted OTA update system backed by GitHub Releases.
+import 'local_store.dart';
+
+/// GitHub-Releases in-app update checker for the fully-offline Uniro app.
 ///
-/// Flow: on startup [checkForUpdate] hits the GitHub API for the latest
-/// release, compares the tag against the installed version, and if a newer
-/// version exists the caller shows an update sheet. Downloading streams the
-/// APK straight to disk (never into RAM) with progress callbacks, and
-/// [installApk] hands the file to Android's package installer.
-class UpdateService {
-  UpdateService._();
+/// Flow: [checkForUpdate] reads the latest release, compares it against
+/// the installed version, and returns an [AppUpdate] when a newer build
+/// exists. Everything is wrapped in try/catch with a short timeout —
+/// no internet or any error fails silently and NEVER blocks the app.
+///
+/// GitHub account/organisation that owns the `uniro` repository.
+const kGithubUser = 'sudoguy47';
 
-  /// TODO: Replace with your actual GitHub repository (owner/repo).
-  static const String _repo = 'YOUR_USERNAME/YOUR_REPO';
+/// Repository name holding the releases.
+const kGithubRepo = 'uniro';
 
-  /// Release asset name must end with this suffix to be detected.
-  static const String _apkSuffix = '.apk';
+/// Set by the user via "Skip this version" (persisted in
+/// SharedPreferences through [LocalStore], so it survives restarts).
+const _skipKey = 'update_skip_tag';
 
-  /// GitHub API requires a User-Agent header.
-  static const Map<String, String> _headers = {
-    'User-Agent': 'CampusTracker-App',
-    'Accept': 'application/vnd.github+json',
-  };
+/// Update info for one newer GitHub release.
+class AppUpdate {
+  const AppUpdate({
+    required this.tag,
+    required this.version,
+    required this.notes,
+    required this.apkUrl,
+  });
 
-  static const Duration _timeout = Duration(seconds: 15);
+  /// Raw tag, e.g. "v1.2.0".
+  final String tag;
 
-  /// Information about an available update.
-  static Future<UpdateInfo?> checkForUpdate() async {
-    if (_repo == 'YOUR_USERNAME/YOUR_REPO') return null;
-    try {
-      final info = await PackageInfo.fromPlatform();
-      final currentVersion = info.version; // e.g. "1.0.0"
+  /// Pretty version without prefix/build, e.g. "1.2.0".
+  final String version;
 
-      final response = await http
-          .get(
-            Uri.parse('https://api.github.com/repos/$_repo/releases/latest'),
-            headers: _headers,
-          )
-          .timeout(_timeout);
+  /// Release notes (`body`), may be empty.
+  final String notes;
 
-      if (response.statusCode != 200) return null;
+  /// Direct download URL of the release `.apk` asset.
+  final String apkUrl;
+}
 
-      final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final latestVersion = (json['tag_name'] as String? ?? '')
-          .replaceFirst(RegExp(r'^[vV]'), '');
-
-      if (latestVersion.isEmpty) return null;
-
-      // Ignore malformed / dev tags (e.g. "1.2.0-beta.1" parses to 1.2.0).
-      if (!_isNewerVersion(currentVersion, latestVersion)) return null;
-
-      final assets = (json['assets'] as List? ?? const []);
-      final downloadUrl = assets
-          .whereType<Map<String, dynamic>>()
-          .where((a) => (a['name'] as String? ?? '').endsWith(_apkSuffix))
-          .map((a) => a['browser_download_url'] as String?)
-          .firstWhere((url) => url != null && url.isNotEmpty, orElse: () => null);
-
-      if (downloadUrl == null) return null;
-
-      return UpdateInfo(
-        currentVersion: currentVersion,
-        latestVersion: latestVersion,
-        downloadUrl: downloadUrl,
-        releaseNotes: json['body'] as String? ?? '',
-        assetSizeBytes: _firstApkSize(assets),
-      );
-    } catch (_) {
-      // Offline, rate-limited, or API shape changed — silently skip.
-      return null;
-    }
+/// Compares dotted versions numerically: "1.10.0" > "1.9.0".
+/// Strips a leading "v"/"V" and any "+build" suffix first.
+/// Returns <0 / 0 / >0 like [Comparable.compareTo].
+int compareVersions(String a, String b) {
+  List<int> parts(String v) {
+    var s = v.trim();
+    if (s.startsWith('v') || s.startsWith('V')) s = s.substring(1);
+    s = s.split('+').first;
+    return s.split('.').map((p) => int.tryParse(p) ?? 0).toList();
   }
 
-  static int? _firstApkSize(List<dynamic> assets) {
-    for (final asset in assets) {
-      if (asset is Map<String, dynamic> &&
-          (asset['name'] as String? ?? '').endsWith(_apkSuffix)) {
-        final size = asset['size'];
-        if (size is num) return size.toInt();
-      }
-    }
-    return null;
+  final pa = parts(a);
+  final pb = parts(b);
+  final len = pa.length > pb.length ? pa.length : pb.length;
+  for (var i = 0; i < len; i++) {
+    final x = i < pa.length ? pa[i] : 0;
+    final y = i < pb.length ? pb[i] : 0;
+    if (x != y) return x.compareTo(y);
   }
+  return 0;
+}
 
-  /// Compares "major.minor.patch" strings. Returns true if [latest] > [current].
-  static bool _isNewerVersion(String current, String latest) {
-    final currentParts = _versionParts(current);
-    final latestParts = _versionParts(latest);
-    if (currentParts == null || latestParts == null) return false;
-    for (var i = 0; i < 3; i++) {
-      if (latestParts[i] > currentParts[i]) return true;
-      if (latestParts[i] < currentParts[i]) return false;
-    }
-    return false;
-  }
+/// Returns the pretty version of a tag ("v1.2.0+3" -> "1.2.0").
+String prettyVersion(String tag) {
+  var s = tag.trim();
+  if (s.startsWith('v') || s.startsWith('V')) s = s.substring(1);
+  return s.split('+').first;
+}
 
-  /// Extracts the leading numeric triple from a version string.
-  /// "1.2.3", "v1.2.3", "1.2.3+5", "1.2.3-beta" all yield [1, 2, 3].
-  static List<int>? _versionParts(String version) {
-    final match = RegExp(r'(\d+)\.(\d+)\.(\d+)').firstMatch(version);
-    if (match == null) return null;
-    return [
-      int.parse(match.group(1)!),
-      int.parse(match.group(2)!),
-      int.parse(match.group(3)!),
-    ];
-  }
+/// Checks GitHub Releases for a newer build.
+///
+/// Returns an [AppUpdate] when the latest tag is newer than both the
+/// installed version AND the skipped version, otherwise null.
+/// Never throws — offline or any error yields null.
+Future<AppUpdate?> checkForUpdate() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    // package_info_plus version is "1.0.0+1": compare the dotted part.
+    final installed = info.version;
 
-  /// Streams the APK to external storage. [onProgress] receives 0.0 - 1.0.
-  /// Returns the downloaded file path, or null on failure.
-  static Future<String?> downloadApk(
-    String url,
-    void Function(double progress) onProgress,
-  ) async {
-    http.Client? client;
-    try {
-      final dir = await getExternalStorageDirectory() ??
-          await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/campustracker-update.apk');
+    final uri = Uri.https(
+      'api.github.com',
+      '/repos/$kGithubUser/$kGithubRepo/releases/latest',
+    );
+    final res = await http
+        .get(uri, headers: {'Accept': 'application/vnd.github+json'})
+        .timeout(const Duration(seconds: 5));
+    if (res.statusCode != 200) return null;
 
-      // Delete a stale partial download from a previous attempt.
-      if (await file.exists()) await file.delete();
+    final json = jsonDecode(res.body);
+    if (json is! Map) return null;
+    final tag = (json['tag_name'] as String?) ?? '';
+    if (tag.isEmpty) return null;
+    if (compareVersions(tag, installed) <= 0) return null;
 
-      client = http.Client();
-      final request = http.Request('GET', Uri.parse(url))..headers.addAll(_headers);
-      final response = await client.send(request).timeout(_timeout);
+    final skipped = LocalStore.instance.load(_skipKey) as String?;
+    if (skipped == tag) return null;
 
-      if (response.statusCode != 200) return null;
-
-      final totalBytes = response.contentLength ?? 0;
-      var receivedBytes = 0;
-      var lastReportedPercent = -1;
-
-      final sink = file.openWrite();
-      try {
-        await for (final chunk in response.stream) {
-          receivedBytes += chunk.length;
-          sink.add(chunk);
-          if (totalBytes > 0) {
-            // Throttle UI updates: only emit when the integer percent changes,
-            // so the progress bar never triggers hundreds of rebuilds.
-            final percent = ((receivedBytes / totalBytes) * 100).floor();
-            if (percent != lastReportedPercent) {
-              lastReportedPercent = percent;
-              onProgress(percent / 100);
-            }
-          }
+    String apkUrl = '';
+    final assets = json['assets'];
+    if (assets is List) {
+      for (final a in assets) {
+        if (a is! Map) continue;
+        final url = (a['browser_download_url'] as String?) ?? '';
+        final name = (a['name'] as String?) ?? '';
+        if (url.isNotEmpty &&
+            (name.toLowerCase().endsWith('.apk') ||
+                url.toLowerCase().endsWith('.apk'))) {
+          apkUrl = url;
+          break;
         }
-        await sink.flush();
-        await sink.close();
-      } catch (_) {
-        await sink.close().catchError((_) {});
-        if (await file.exists()) await file.delete();
-        rethrow;
       }
-
-      onProgress(1.0);
-      return file.path;
-    } catch (_) {
-      return null;
-    } finally {
-      client?.close();
     }
-  }
+    if (apkUrl.isEmpty) return null;
 
-  /// Requests the install permission (Android 8+) and launches the system
-  /// installer for the downloaded APK. Returns true if the installer opened.
-  static Future<bool> installApk(String apkPath) async {
-    try {
-      var status = await Permission.requestInstallPackages.status;
-      if (!status.isGranted) {
-        status = await Permission.requestInstallPackages.request();
-      }
-      if (!status.isGranted) return false;
-
-      final result = await OpenFilex.open(apkPath);
-      return result.type == ResultType.done;
-    } catch (_) {
-      return false;
-    }
+    return AppUpdate(
+      tag: tag,
+      version: prettyVersion(tag),
+      notes: (json['body'] as String?) ?? '',
+      apkUrl: apkUrl,
+    );
+  } catch (e) {
+    debugPrint('update check notice: $e');
+    return null;
   }
 }
 
-/// Immutable snapshot of an available release.
-class UpdateInfo {
-  const UpdateInfo({
-    required this.currentVersion,
-    required this.latestVersion,
-    required this.downloadUrl,
-    required this.releaseNotes,
-    this.assetSizeBytes,
-  });
+/// Remembers [tag] as skipped so the startup dialog stops asking for it.
+void skipUpdateVersion(String tag) {
+  try {
+    LocalStore.instance.save(_skipKey, tag);
+  } catch (e) {
+    debugPrint('skip version notice: $e');
+  }
+}
 
-  final String currentVersion;
-  final String latestVersion;
-  final String downloadUrl;
-  final String releaseNotes;
-  final int? assetSizeBytes;
-
-  String get formattedSize {
-    final bytes = assetSizeBytes;
-    if (bytes == null || bytes <= 0) return '';
-    if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / 1024).toStringAsFixed(0)} KB';
+/// Installed version string for "Check for updates" rows, e.g. "1.0.0".
+Future<String> installedVersion() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    return info.version;
+  } catch (_) {
+    return '';
   }
 }

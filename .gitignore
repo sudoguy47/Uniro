@@ -1,84 +1,56 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
+node_modules
+.next
+out
 .DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+*.tsbuildinfo
+next-env.d.ts
+.env*.local
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# Uploaded screenshots belong to the generated project: commit them alongside
+# app-store-screenshots.json so decks remain reproducible after cloning.
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# Fonts imported from the editor toolbar are user assets too (and font licences
+# often forbid redistributing them), so keep them out of the template as well.
+public/fonts/imported/*
+!public/fonts/imported/.gitkeep
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Tester Army output
+.e2e/
+
+# ── Flutter (source-controlled repo: no build output, no local tool state) ──
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# Widget Preview related
-.widget_preview/
-
-# Auto-generated entries
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Build outputs
-dist/
 build/
-*.log
-
-# Environment files
-.env
-.env.*
-!.env.example
-
-# IDE files
-.vscode/
+*.iml
 .idea/
-*.swp
-*.swo
-
-# OS files
 .DS_Store
-Thumbs.db
+.widget_preview/
+android/build/
+android/.gradle/
+android/app/build/
+android/local.properties
+android/key.properties
+*.jks
+*.keystore
+*.env
+ios/Pods/
+ios/.symlinks/
+linux/build/
+windows/build/
+macos/build/
+web/build/
 
-# Temporary files
-*.tmp
-*.temp
-.cache/
+# goldie generated captures (config + flows ARE committed)
+goldie/out/
+out/
 
-# Sensitive files (auto-detected)
-build
+
+# Next.js screenshot editor
+.next
+*.tsbuildinfo
+next-env.d.ts
+public/fonts/imported/*
+!public/fonts/imported/.gitkeep
+.e2e/
 

@@ -186,6 +186,7 @@ class Note {
   final bool isLocked;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? courseId;
 
   const Note({
     required this.id,
@@ -197,6 +198,7 @@ class Note {
     this.isLocked = false,
     required this.createdAt,
     required this.updatedAt,
+    this.courseId,
   });
 
   bool get isEmpty =>
@@ -216,6 +218,8 @@ class Note {
     bool? isPinned,
     bool? isLocked,
     DateTime? updatedAt,
+    String? courseId,
+    bool clearCourseId = false,
   }) => Note(
     id: id,
     title: title ?? this.title,
@@ -226,6 +230,7 @@ class Note {
     isLocked: isLocked ?? this.isLocked,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    courseId: clearCourseId ? null : (courseId ?? this.courseId),
   );
 
   Map<String, dynamic> toJson() => {
@@ -238,6 +243,7 @@ class Note {
     'isLocked': isLocked,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'courseId': courseId,
   };
 
   factory Note.fromJson(Map<String, dynamic> j) => Note(
@@ -252,6 +258,7 @@ class Note {
     isLocked: j['isLocked'] as bool? ?? false,
     createdAt: DateTime.parse(j['createdAt'] as String),
     updatedAt: DateTime.parse(j['updatedAt'] as String),
+    courseId: j['courseId'] as String?,
   );
 }
 

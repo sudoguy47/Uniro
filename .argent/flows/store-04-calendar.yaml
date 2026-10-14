@@ -1,0 +1,11 @@
+# Scene 4: calendar on the monthly view.
+# Bottom nav labels are real text, so this flow is selector-stable.
+steps:
+  - launch: com.example.uniro1
+  - await: { visible: { text: Skip } }
+  - tap: { text: Skip }
+  - await: { visible: { text: "Weekly load" } }
+  - tap: { text: Calendar }
+  - await: { visible: { text: Monthly } }
+  - wait: 800
+  - await: { idle: true }

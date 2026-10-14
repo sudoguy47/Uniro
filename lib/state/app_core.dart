@@ -6,10 +6,12 @@ import '../models/settings.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import 'package:flutter/services.dart';
-import '../domain/preloaded_tasks.dart';
 
 mixin AppCore on ChangeNotifier {
   static const _widgetChannel = MethodChannel('com.example.uniro1/widget');
+  // Shared formatters — DateFormat construction parses locale skeletons and
+  // is surprisingly expensive; one static instance serves all calls.
+  static final DateFormat _ymdFmt = DateFormat('yyyy-MM-dd');
   // ── State (RAM) ──────────────────────────────────────────────────────────
   List<Task> _tasks = [];
   UserSettings _settings = UserSettings.defaults();
@@ -80,8 +82,8 @@ mixin AppCore on ChangeNotifier {
           .map((j) => Task.fromJson(Map<String, dynamic>.from(j as Map)))
           .toList();
     } else {
-      // First launch or empty state: seed with realistic preloaded tasks
-      _tasks = getPreloadedTasks();
+      // Fresh start: no preloaded demo data — the user adds their own.
+      _tasks = [];
       persistNow();
     }
     final rawSettings = LocalStore.instance.load('settings');
@@ -153,6 +155,21 @@ mixin AppCore on ChangeNotifier {
     _persist();
   }
 
+  /// Unlinks a deleted course from all tasks (tasks themselves are kept).
+  void unlinkCourse(String courseId) {
+    var changed = false;
+    for (var i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].courseId == courseId) {
+        _tasks[i] = _tasks[i].copyWith(clearCourseId: true);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    _clearComputedCaches();
+    notifyListeners();
+    _persist();
+  }
+
   void setFilter(TaskType? filter) {
     if (_activeFilter == filter) return;
     _activeFilter = filter;
@@ -165,6 +182,11 @@ mixin AppCore on ChangeNotifier {
     _settings = s;
     notifyListeners();
     LocalStore.instance.save('settings', s.toJson());
+    // Keep the daily 6 AM greeting in sync with name + toggle.
+    unawaited(NotificationService.instance.scheduleDailyGreeting(
+      name: s.name,
+      enabled: s.notificationsEnabled,
+    ));
   }
 
   // ── Computed (Cached to eliminate Scavenge GC) ───────────────────────────
@@ -197,12 +219,11 @@ mixin AppCore on ChangeNotifier {
     final cached = _cachedWeeklyLoad[weekStart];
     if (cached != null) return cached;
 
-    final fmt = DateFormat('yyyy-MM-dd');
     final start = DateTime.parse(weekStart);
     final map = <String, int>{};
     for (int i = 0; i < 7; i++) {
       final d = start.add(Duration(days: i));
-      final key = fmt.format(d);
+      final key = _ymdFmt.format(d);
       map[key] = _tasks
           .where((t) => t.dueDate == key && t.status == TaskStatus.pending)
           .length;

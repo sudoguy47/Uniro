@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
+import '../services/update_service.dart';
 import '../state/app_state.dart';
+import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import '../widgets/ui_kit.dart';
+import 'courses_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -272,8 +276,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                             if (!enabled) {
                               NotificationService.instance.cancelAll();
                             } else {
+                              // Explicit user action: prompt for permission,
+                              // then (re)arm everything if granted.
+                              final routine =
+                                  context.read<RoutineState>();
                               NotificationService.instance
-                                  .rescheduleAll(appState.tasks);
+                                  .requestPermissions()
+                                  .then((granted) {
+                                if (granted) {
+                                  NotificationService.instance.rearmAll(
+                                    tasks: appState.tasks,
+                                    courses: routine.courses,
+                                    slots: routine.slots,
+                                    name: appState.settings.name,
+                                    enabled: true,
+                                  );
+                                }
+                              });
                             }
                           },
                         ),
@@ -282,6 +301,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Courses Card
+              _CoursesRow(),
+              const SizedBox(height: 16),
+
+              // App updates (GitHub Releases, fully offline-safe).
+              const _UpdateCard(),
               const SizedBox(height: 16),
 
               // Theme Settings Card
@@ -349,6 +376,209 @@ class _ProfileScreenState extends State<ProfileScreen>
               const SizedBox(height: 100),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// App updates via GitHub Releases: installed version, manual check,
+/// "up to date" confirmation, and the same update dialog as startup.
+class _UpdateCard extends StatefulWidget {
+  const _UpdateCard();
+
+  @override
+  State<_UpdateCard> createState() => _UpdateCardState();
+}
+
+class _UpdateCardState extends State<_UpdateCard> {
+  String _version = '';
+  bool _checking = false;
+
+  @override
+  void initState() {
+    super.initState();
+    installedVersion().then((v) {
+      if (mounted && v.isNotEmpty) setState(() => _version = v);
+    });
+  }
+
+  Future<void> _manualCheck() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    try {
+      final update = await checkForUpdate();
+      if (!mounted) return;
+      final c = Theme.of(context).extension<AppColors>()!;
+      if (update == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('You are up to date.')));
+      } else {
+        await showDialog<void>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            backgroundColor: c.cardBg,
+            title: const Text('Update available'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Version ${update.version} is ready.',
+                      style:
+                          const TextStyle(fontWeight: FontWeight.w700)),
+                  if (update.notes.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(update.notes.trim(),
+                        style: TextStyle(
+                            fontSize: 13, color: c.textSecondary)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Later'),
+              ),
+              TextButton(
+                onPressed: () {
+                  skipUpdateVersion(update.tag);
+                  Navigator.pop(dialogCtx);
+                },
+                child: const Text('Skip this version'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  Navigator.pop(dialogCtx);
+                  try {
+                    await launchUrl(
+                      Uri.parse(update.apkUrl),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  } catch (e) {
+                    debugPrint('open apk link notice: $e');
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.accent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Update'),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'App updates',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _version.isEmpty
+                      ? 'Check for new releases'
+                      : 'Installed v$_version',
+                  style:
+                      TextStyle(fontSize: 13, color: c.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: _checking
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    _manualCheck();
+                  },
+            style: FilledButton.styleFrom(
+              backgroundColor: c.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(_checking ? 'Checking…' : 'Check for updates'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Profile > Courses navigation row (count + chevron).
+class _CoursesRow extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final count = context.select((RoutineState r) => r.courses.length);
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CoursesScreen()),
+        );
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: c.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Courses',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: c.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$count course${count == 1 ? '' : 's'}',
+                    style:
+                        TextStyle(fontSize: 13, color: c.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
+          ],
         ),
       ),
     );

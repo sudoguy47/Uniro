@@ -16,6 +16,10 @@ class LocalStore {
     _prefs?.setString('ct_$key', jsonEncode(data));
   }
 
+  Future<void> remove(String key) async {
+    await _prefs?.remove('ct_$key');
+  }
+
   dynamic load(String key) {
     final raw = _prefs?.getString('ct_$key');
     if (raw == null) return null;

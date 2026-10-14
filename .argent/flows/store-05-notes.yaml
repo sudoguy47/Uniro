@@ -1,0 +1,26 @@
+# Scene 5: note editor with typed content (sells Notes better than the
+# empty state; fresh installs have no notes, so the flow creates one).
+# Title/body field taps are coordinates — hint text is not reliably
+# matchable, so verify against a real capture and refine if they miss.
+steps:
+  - launch: com.example.uniro1
+  - await: { visible: { text: Skip } }
+  - tap: { text: Skip }
+  - await: { visible: { text: "Weekly load" } }
+  - tap: { text: Notes }
+  - await: { visible: { text: "New Note" } }
+  - tap: { text: "New Note" }
+  - await: { visible: { text: Untitled } }
+  - wait: 500
+  # Title field near the top of the editor.
+  - echo: Tap the note title field (below the date line)
+  - tap: { x: 0.5, y: 0.18 }
+  - tool: keyboard
+    args: { text: "Campus survival guide" }
+  # First body block below the title.
+  - echo: Tap the first body block (empty paragraph with Start writing hint)
+  - tap: { x: 0.5, y: 0.32 }
+  - tool: keyboard
+    args: { text: "Midterms reward the prepared. One chapter a day." }
+  - wait: 800
+  - await: { idle: true }

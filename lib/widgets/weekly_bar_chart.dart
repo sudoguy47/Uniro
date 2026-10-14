@@ -32,6 +32,16 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
     final maxCount = math.max(1, widget.load.values.fold(0, math.max));
     final activeSelectedDay = widget.selectedDay ?? _tappedDay;
 
+    // Parse weekStart ONCE per build (was 7x — one per bar) and derive all
+    // 7 date keys up front. Eliminates repeated string parsing on every
+    // dashboard frame.
+    final base = DateTime.parse(widget.weekStart);
+    final dateStrs = List<String>.generate(7, (i) {
+      final d = base.add(Duration(days: i));
+      return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    });
+    final dayNums = List<int>.generate(7, (i) => base.add(Duration(days: i)).day);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -46,9 +56,7 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
-                final d = DateTime.parse(widget.weekStart).add(Duration(days: i));
-                final dateStr =
-                    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                final dateStr = dateStrs[i];
                 final count = widget.load[dateStr] ?? 0;
                 final barHeight = count > 0
                     ? math.max(12.0, (count / maxCount) * 58)
@@ -124,7 +132,7 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          '${d.day}',
+                          '${dayNums[i]}',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,

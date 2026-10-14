@@ -1,9 +1,9 @@
-import 'package:uuid/uuid.dart';
+import '../domain/ids.dart';
 
-enum TaskType { assignment, exam, ct, viva, presentation, lab, project, other }
+enum TaskType { assignment, exam, ct, viva, presentation, lab, project, other, custom }
 enum TaskPriority { high, medium, low }
 enum TaskStatus { pending, completed }
-enum ReminderType { atTime, oneHour, oneDay, threeDays, oneWeek, custom }
+enum ReminderType { atTime, oneHour, oneDay, twoDays, threeDays, sevenDays, oneWeek, custom }
 
 class Reminder {
   final String id;
@@ -16,7 +16,7 @@ class Reminder {
     required this.type,
     this.customDays,
     this.notificationId,
-  }) : id = id ?? const Uuid().v4();
+  }) : id = id ?? newLocalId();
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -46,6 +46,7 @@ class Task {
   final List<Reminder> reminders;
   final String createdAt;
   final String? completedAt;
+  final String? courseId;
 
   Task({
     String? id,
@@ -60,7 +61,8 @@ class Task {
     this.reminders = const [],
     String? createdAt,
     this.completedAt,
-  })  : id = id ?? const Uuid().v4(),
+    this.courseId,
+  })  : id = id ?? newLocalId(),
         createdAt = createdAt ?? DateTime.now().toIso8601String();
 
   Task copyWith({
@@ -75,6 +77,8 @@ class Task {
     List<Reminder>? reminders,
     String? completedAt,
     bool clearCompletedAt = false,
+    String? courseId,
+    bool clearCourseId = false,
   }) => Task(
     id: id,
     createdAt: createdAt,
@@ -88,6 +92,7 @@ class Task {
     status: status ?? this.status,
     reminders: reminders ?? this.reminders,
     completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
+    courseId: clearCourseId ? null : (courseId ?? this.courseId),
   );
 
   Map<String, dynamic> toJson() => {
@@ -103,6 +108,7 @@ class Task {
     'reminders': reminders.map((r) => r.toJson()).toList(),
     'createdAt': createdAt,
     'completedAt': completedAt,
+    'courseId': courseId,
   };
 
   factory Task.fromJson(Map<String, dynamic> j) => Task(
@@ -120,5 +126,6 @@ class Task {
         .toList(),
     createdAt: j['createdAt'],
     completedAt: j['completedAt'],
+    courseId: j['courseId'] as String?,
   );
 }

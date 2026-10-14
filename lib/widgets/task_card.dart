@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/task.dart';
@@ -200,9 +201,10 @@ class _TaskCheckButtonState extends State<_TaskCheckButton>
 
   Future<void> _handleTap() async {
     HapticFeedback.mediumImpact();
-    await _checkCtrl.reverse();
-    await _checkCtrl.forward();
+    // Fire the completion immediately so the UI responds in the same frame;
+    // run the scale animation unawaited so it never delays state updates.
     widget.onComplete();
+    unawaited(_checkCtrl.reverse().then((_) => _checkCtrl.forward()));
   }
 
   @override

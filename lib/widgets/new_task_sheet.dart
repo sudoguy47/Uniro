@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
+import '../models/course.dart';
 import '../state/app_state.dart';
+import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
 import 'ui_kit.dart';
 import 'reminder_picker_sheet.dart';
@@ -41,6 +43,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
   final _descCtrl = TextEditingController();
 
   late TaskType _type;
+  String? _courseId;
   late DateTime _dueDate;
   TimeOfDay? _dueTime;
   bool _hasTime = false;
@@ -114,6 +117,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
       hasTime: _hasTime,
       priority: _priority,
       reminders: _reminders,
+      courseId: _courseId,
     );
 
     context.read<AppState>().addTask(task);
@@ -130,6 +134,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         TaskType.lab => 'Lab / Class',
         TaskType.project => 'Project',
         TaskType.other => 'Other / Lecture',
+        TaskType.custom => 'Custom',
       };
 
   IconData _iconForType(TaskType t) => switch (t) {
@@ -141,6 +146,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         TaskType.lab => Icons.science_outlined,
         TaskType.project => Icons.architecture_outlined,
         TaskType.other => Icons.event_note_outlined,
+        TaskType.custom => Icons.tune_rounded,
       };
 
   @override
@@ -302,51 +308,80 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                   await showModalBottomSheet<TaskType>(
                                 context: context,
                                 backgroundColor: c.cardBg,
+                                isScrollControlled: true,
                                 shape: const RoundedRectangleBorder(
                                   borderRadius: BorderRadius.vertical(
                                       top: Radius.circular(20)),
                                 ),
                                 builder: (ctx) => SafeArea(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Text(
-                                          'Select Task Type',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: c.textPrimary,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      maxHeight:
+                                          MediaQuery.of(ctx).size.height * 0.72,
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 36,
+                                          height: 4,
+                                          margin: const EdgeInsets.only(top: 12),
+                                          decoration: BoxDecoration(
+                                            color: c.border,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
                                           ),
                                         ),
-                                      ),
-                                      ...TaskType.values.map((t) {
-                                        final isCurrent = t == _type;
-                                        return ListTile(
-                                          leading: Icon(_iconForType(t),
-                                              color: isCurrent
-                                                  ? c.accent
-                                                  : c.textSecondary),
-                                          title: Text(
-                                            _formatType(t),
+                                        Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Text(
+                                            'Select Task Type',
                                             style: TextStyle(
-                                              fontWeight: isCurrent
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              color: isCurrent
-                                                  ? c.accent
-                                                  : c.textPrimary,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: c.textPrimary,
                                             ),
                                           ),
-                                          trailing: isCurrent
-                                              ? Icon(Icons.check,
-                                                  color: c.accent)
-                                              : null,
-                                          onTap: () => Navigator.pop(ctx, t),
-                                        );
-                                      }),
-                                    ],
+                                        ),
+                                        // Scrollable: 9 types no longer fit on
+                                        // small screens — previously the last
+                                        // rows were clipped off-screen.
+                                        Flexible(
+                                          child: ListView.builder(
+                                            shrinkWrap: true,
+                                            itemCount: TaskType.values.length,
+                                            itemBuilder: (ctx, i) {
+                                              final t = TaskType.values[i];
+                                              final isCurrent = t == _type;
+                                              return ListTile(
+                                                leading: Icon(
+                                                    _iconForType(t),
+                                                    color: isCurrent
+                                                        ? c.accent
+                                                        : c.textSecondary),
+                                                title: Text(
+                                                  _formatType(t),
+                                                  style: TextStyle(
+                                                    fontWeight: isCurrent
+                                                        ? FontWeight.bold
+                                                        : FontWeight.normal,
+                                                    color: isCurrent
+                                                        ? c.accent
+                                                        : c.textPrimary,
+                                                  ),
+                                                ),
+                                                trailing: isCurrent
+                                                    ? Icon(Icons.check,
+                                                        color: c.accent)
+                                                    : null,
+                                                onTap: () =>
+                                                    Navigator.pop(ctx, t),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               );
@@ -379,6 +414,15 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                 ],
                               ),
                             ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _label('COURSE (OPTIONAL)', c),
+                          const SizedBox(height: 6),
+                          _CourseField(
+                            courseId: _courseId,
+                            onChanged: (v) =>
+                                setState(() => _courseId = v),
                           ),
                           const SizedBox(height: 16),
 
@@ -649,6 +693,142 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         fontWeight: FontWeight.bold,
         letterSpacing: 1.0,
         color: c.textTertiary,
+      ),
+    );
+  }
+}
+
+/// Optional course link row for the task form. "None" clears the link.
+class _CourseField extends StatelessWidget {
+  const _CourseField({required this.courseId, required this.onChanged});
+  final String? courseId;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final courses = context.select((RoutineState r) => r.courses);
+    Course? selected;
+    for (final course in courses) {
+      if (course.id == courseId) selected = course;
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        HapticFeedback.selectionClick();
+        final picked = await showModalBottomSheet<String?>(
+          context: context,
+          backgroundColor: c.cardBg,
+          shape: const RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) => SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Link Course (optional)',
+                      style: TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        ListTile(
+                          title: const Text('None'),
+                          trailing: courseId == null
+                              ? Icon(Icons.check, color: c.accent)
+                              : null,
+                          // '' sentinel = explicit clear (backdrop
+                          // dismiss yields null and keeps the value).
+                          onTap: () => Navigator.pop(ctx, ''),
+                        ),
+                        ...courses.map((course) {
+                          final isCurrent = course.id == courseId;
+                          return ListTile(
+                            leading: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: course.colorTag != null
+                                    ? Color(course.colorTag!)
+                                    : c.border,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            title: Text(
+                              (course.code ?? '').isNotEmpty
+                                  ? '${course.code} · ${course.name}'
+                                  : course.name,
+                              style: TextStyle(
+                                fontWeight: isCurrent
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isCurrent
+                                    ? c.accent
+                                    : c.textPrimary,
+                              ),
+                            ),
+                            trailing: isCurrent
+                                ? Icon(Icons.check, color: c.accent)
+                                : null,
+                            onTap: () =>
+                                Navigator.pop(ctx, course.id),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        // Null return = tapped None OR dismissed. Dismiss should keep the
+        // current value, so only clear when explicitly picking None… but
+        // Navigator.pop(ctx) with no arg also yields null. Distinguish by
+        // using a sentinel: None pops with '' (empty = clear).
+        if (picked != null) {
+          onChanged(picked.isEmpty ? null : picked);
+        }
+      },
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: c.inputBg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.school_outlined, size: 18, color: c.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                selected == null
+                    ? 'None'
+                    : ((selected.code ?? '').isNotEmpty
+                        ? '${selected.code} · ${selected.name}'
+                        : selected.name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight: FontWeight.w600, color: c.textPrimary),
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.keyboard_arrow_down, color: c.textSecondary),
+          ],
+        ),
       ),
     );
   }

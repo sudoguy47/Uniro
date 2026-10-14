@@ -31,6 +31,13 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.fabIcon,
     required this.toggleActive,
     required this.toggleInactive,
+    required this.focusBg,
+    required this.focusCardTop,
+    required this.focusCardBottom,
+    required this.focusDigit,
+    required this.focusHinge,
+    required this.focusBtnBg,
+    required this.focusBtnText,
   });
 
   final Color pageBg;
@@ -60,6 +67,13 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color fabIcon;
   final Color toggleActive;
   final Color toggleInactive;
+  final Color focusBg;
+  final Color focusCardTop;
+  final Color focusCardBottom;
+  final Color focusDigit;
+  final Color focusHinge;
+  final Color focusBtnBg;
+  final Color focusBtnText;
 
   // ── Light Mode ──────────────────────────────────────────────
   static const light = AppColors(
@@ -90,6 +104,13 @@ class AppColors extends ThemeExtension<AppColors> {
     fabIcon: Color(0xFFFFFFFF),
     toggleActive: Color(0xFFE8963C),
     toggleInactive: Color(0xFFD0C9C0),
+    focusBg: Color(0xFFEAE5D8),
+    focusCardTop: Color(0xFFF6F3EB),
+    focusCardBottom: Color(0xFFEEEADF),
+    focusDigit: Color(0xFF1D1B18),
+    focusHinge: Color(0x1F000000),
+    focusBtnBg: Color(0xFF2A2622),
+    focusBtnText: Color(0xFFF6F3EB),
   );
 
   // ── Dark Mode ───────────────────────────────────────────────
@@ -121,6 +142,13 @@ class AppColors extends ThemeExtension<AppColors> {
     fabIcon: Color(0xFF1A1713),
     toggleActive: Color(0xFFE8963C),
     toggleInactive: Color(0xFF3A3630),
+    focusBg: Color(0xFF141311),
+    focusCardTop: Color(0xFF262320),
+    focusCardBottom: Color(0xFF1F1C1A),
+    focusDigit: Color(0xFFF2EEE6),
+    focusHinge: Color(0x24FFFFFF),
+    focusBtnBg: Color(0xFFF2EEE6),
+    focusBtnText: Color(0xFF1D1B18),
   );
 
   @override
@@ -152,6 +180,13 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? fabIcon,
     Color? toggleActive,
     Color? toggleInactive,
+    Color? focusBg,
+    Color? focusCardTop,
+    Color? focusCardBottom,
+    Color? focusDigit,
+    Color? focusHinge,
+    Color? focusBtnBg,
+    Color? focusBtnText,
   }) {
     return AppColors(
       pageBg: pageBg ?? this.pageBg,
@@ -181,6 +216,13 @@ class AppColors extends ThemeExtension<AppColors> {
       fabIcon: fabIcon ?? this.fabIcon,
       toggleActive: toggleActive ?? this.toggleActive,
       toggleInactive: toggleInactive ?? this.toggleInactive,
+      focusBg: focusBg ?? this.focusBg,
+      focusCardTop: focusCardTop ?? this.focusCardTop,
+      focusCardBottom: focusCardBottom ?? this.focusCardBottom,
+      focusDigit: focusDigit ?? this.focusDigit,
+      focusHinge: focusHinge ?? this.focusHinge,
+      focusBtnBg: focusBtnBg ?? this.focusBtnBg,
+      focusBtnText: focusBtnText ?? this.focusBtnText,
     );
   }
 
@@ -215,6 +257,13 @@ class AppColors extends ThemeExtension<AppColors> {
       fabIcon: Color.lerp(fabIcon, other.fabIcon, t)!,
       toggleActive: Color.lerp(toggleActive, other.toggleActive, t)!,
       toggleInactive: Color.lerp(toggleInactive, other.toggleInactive, t)!,
+      focusBg: Color.lerp(focusBg, other.focusBg, t)!,
+      focusCardTop: Color.lerp(focusCardTop, other.focusCardTop, t)!,
+      focusCardBottom: Color.lerp(focusCardBottom, other.focusCardBottom, t)!,
+      focusDigit: Color.lerp(focusDigit, other.focusDigit, t)!,
+      focusHinge: Color.lerp(focusHinge, other.focusHinge, t)!,
+      focusBtnBg: Color.lerp(focusBtnBg, other.focusBtnBg, t)!,
+      focusBtnText: Color.lerp(focusBtnText, other.focusBtnText, t)!,
     );
   }
 }

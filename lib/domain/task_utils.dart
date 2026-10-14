@@ -13,10 +13,21 @@ String _getTodayString() {
   if (nowMillis - _lastTodayCheckMillis > 60000 || _cachedTodayStr.isEmpty) {
     _lastTodayCheckMillis = nowMillis;
     final today = DateTime.fromMillisecondsSinceEpoch(nowMillis);
-    _cachedTodayStr =
-        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+    _cachedTodayStr = ymd(today);
   }
   return _cachedTodayStr;
+}
+
+/// yyyy-MM-dd for any date (shared by tasks, routine, attendance).
+String ymd(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+/// Start-of-week date string for the week containing [today], weeks beginning
+/// on [weekStartDay] (1–7, DateTime convention). Pure + unit-tested.
+String weekStartString(DateTime today, int weekStartDay) {
+  final base = today.subtract(
+      Duration(days: (today.weekday - weekStartDay + 7) % 7));
+  return ymd(base);
 }
 
 TaskUrgency getUrgency(Task task) {
@@ -64,4 +75,5 @@ IconData iconForTaskType(TaskType t) => switch (t) {
       TaskType.lab => Icons.science_outlined,
       TaskType.project => Icons.architecture_outlined,
       TaskType.other => Icons.event_note_outlined,
+      TaskType.custom => Icons.tune_rounded,
     };

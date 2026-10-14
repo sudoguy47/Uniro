@@ -1,0 +1,8 @@
+# Preview seg 3: save and land back on the dashboard with the new task.
+executionPrerequisite: >-
+  New Task sheet open with a title typed (previous segment ended there).
+steps:
+  - tap: { text: "Save Task" }
+  - await: { hidden: { text: "New Task" } }
+  - await: { visible: { text: "Weekly load" } }
+  - await: { idle: true }
