@@ -42,7 +42,9 @@ class CampusTrackerApp extends StatelessWidget {
       // pagers, sheets) thocks once per boundary-hit gesture.
       builder: (context, child) =>
           BoundaryHaptics(child: child ?? const SizedBox.shrink()),
-      home: showOnboarding ? const OnboardingScreen() : const AppShell(),
+      home: showOnboarding
+          ? const OnboardingScreen()
+          : AppShell(key: AppShell.shellKey),
     );
   }
 }

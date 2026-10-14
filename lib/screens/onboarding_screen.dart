@@ -6,6 +6,7 @@ import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import '../state/app_state.dart';
 import '../widgets/onboarding_mascots.dart';
+import '../widgets/uniro_logo.dart';
 
 /// Native Uniro onboarding matching the brand mocks:
 /// orange grad → blue calendar → green name → purple reminders.
@@ -60,7 +61,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
-        pageBuilder: (context, anim, secAnim) => const AppShell(),
+        pageBuilder: (context, anim, secAnim) => AppShell(
+          key: AppShell.shellKey,
+        ),
         transitionsBuilder: (context, anim, secAnim, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 300),
@@ -90,18 +93,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: Column(
             children: [
               // Brand
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(28, 18, 28, 0),
-                  child: Text(
-                    'Uniro',
-                    style: TextStyle(
-                      fontSize: 27,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
+                  padding: const EdgeInsets.fromLTRB(28, 18, 28, 0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const UniroLogo(size: 28),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Uniro',
+                        style: TextStyle(
+                          fontSize: 27,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

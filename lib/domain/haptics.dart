@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 abstract final class PremiumHaptics {
   static void tap() => HapticFeedback.lightImpact();
   static void select() => HapticFeedback.selectionClick();
+  static void tick() => HapticFeedback.selectionClick();
   static void confirm() => HapticFeedback.mediumImpact();
   static void edge() => HapticFeedback.mediumImpact();
 }

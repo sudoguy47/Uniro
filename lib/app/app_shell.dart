@@ -2,31 +2,46 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/haptics.dart';
 import '../state/app_state.dart';
+import '../state/focus_state.dart';
 import '../state/notes_state.dart';
 import '../theme/app_colors.dart';
 import '../screens/dashboard_screen.dart';
-import '../screens/calendar_screen.dart';
+import '../screens/routine_screen.dart';
+import '../screens/focus_screen.dart';
 import '../screens/notes/notes_screen.dart';
-import '../screens/done_screen.dart';
 import '../screens/profile_screen.dart';
 
-enum AppRoute { dashboard, calendar, notes, done, profile }
+/// Named tab identifiers (no magic indexes). There is no persisted tab
+/// anywhere in the app (route lives in memory only), so no old-index
+/// migration was needed when Calendar/Done left the bar.
+enum AppTab { dashboard, routine, focus, notes, profile }
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.initialTab = AppTab.dashboard});
+  final AppTab initialTab;
+
+  /// Global access for notification taps / drawer / deep links.
+  static final GlobalKey _shellKey = GlobalKey();
+
+  static GlobalKey get shellKey => _shellKey;
+
+  static void openTab(AppTab tab) =>
+      (_shellKey.currentState as _AppShellState?)?.openTab(tab);
+
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
-  AppRoute _route = AppRoute.dashboard;
+  AppTab _tab = AppTab.dashboard;
   late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pageController = PageController(initialPage: _route.index);
+    _tab = widget.initialTab;
+    _pageController = PageController(initialPage: _tab.index);
   }
 
   @override
@@ -48,18 +63,23 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  void _navigate(AppRoute route) {
-    if (route == _route) return;
-    setState(() {
-      _route = route;
-    });
-    _pageController.jumpToPage(route.index);
+  void openTab(AppTab tab) {
+    if (tab == _tab) return;
+    setState(() => _tab = tab);
+    _pageController.jumpToPage(tab.index);
   }
+
+  void _navigate(AppTab tab) => openTab(tab);
 
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
     final isNewTaskOpen = context.select((AppState s) => s.isNewTaskOpen);
+    // Immersive focus run: hide the bottom nav while the timer ticks so
+    // the tab owns the whole screen. Pausing brings it back; it hides
+    // again on resume. Restored automatically when the run ends.
+    final focusRunning =
+        context.select((FocusState f) => f.running && !f.paused);
 
     return Scaffold(
       backgroundColor: c.pageBg,
@@ -71,44 +91,48 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               DashboardScreen(
-                onNavigateToProfile: () => _navigate(AppRoute.profile),
+                onNavigateToProfile: () => _navigate(AppTab.profile),
+                onNavigateToRoutine: () => _navigate(AppTab.routine),
               ),
-              const CalendarScreen(),
+              const RoutineScreen(),
+              const FocusScreen(),
               const NotesScreen(),
-              const DoneScreen(),
               const ProfileScreen(),
             ],
           ),
 
-          // ── Simple Docked Navigation Bar ──────────────────────────────
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AnimatedSlide(
-              offset: isNewTaskOpen ? const Offset(0, 1.2) : Offset.zero,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              child: _SimpleBottomNavBar(
-                current: _route,
-                onTap: _navigate,
+          // ── Simple Docked Navigation Bar (hidden while focus ticks) ──
+          if (!focusRunning)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: AnimatedSlide(
+                offset: isNewTaskOpen ? const Offset(0, 1.2) : Offset.zero,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                child: RepaintBoundary(
+                  child: _BottomNavBar(
+                    current: _tab,
+                    onTap: _navigate,
+                  ),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _SimpleBottomNavBar extends StatelessWidget {
-  const _SimpleBottomNavBar({
+class _BottomNavBar extends StatelessWidget {
+  const _BottomNavBar({
     required this.current,
     required this.onTap,
   });
 
-  final AppRoute current;
-  final ValueChanged<AppRoute> onTap;
+  final AppTab current;
+  final ValueChanged<AppTab> onTap;
 
   static const double _barContentHeight = 68.0;
 
@@ -139,42 +163,39 @@ class _SimpleBottomNavBar extends StatelessWidget {
       child: SizedBox(
         height: _barContentHeight,
         child: Row(
-          children: AppRoute.values.map((route) {
-            final isActive = route == current;
-            final activeColor = c.accent;
+          children: AppTab.values.map((tab) {
+            final isActive = tab == current;
             final inactiveColor = c.navInactive;
 
             return Expanded(
-              child: InkResponse(
-                onTap: () {
-                  // Navbar stays whisper-light: selection click only.
-                  PremiumHaptics.select();
-                  onTap(route);
-                },
-                containedInkWell: true,
-                highlightShape: BoxShape.rectangle,
-                splashColor: c.accent.withValues(alpha: 0.12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      isActive ? _fillIcon(route) : _outlineIcon(route),
-                      size: 27,
-                      color: isActive ? activeColor : inactiveColor,
+              child: Semantics(
+                button: true,
+                label: _label(tab),
+                selected: isActive,
+                child: _NavItem(
+                  active: isActive,
+                  icon: Icon(
+                    isActive ? _fillIcon(tab) : _outlineIcon(tab),
+                    size: 27,
+                    color: isActive ? c.accent : inactiveColor,
+                  ),
+                  label: Text(
+                    _label(tab),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight:
+                          isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive ? c.accent : inactiveColor,
+                      letterSpacing: -0.1,
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      _label(route),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                        color: isActive ? activeColor : inactiveColor,
-                        letterSpacing: -0.1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () {
+                    // Navbar stays whisper-light: selection click only.
+                    PremiumHaptics.select();
+                    onTap(tab);
+                  },
                 ),
               ),
             );
@@ -184,27 +205,105 @@ class _SimpleBottomNavBar extends StatelessWidget {
     );
   }
 
-  IconData _fillIcon(AppRoute r) => switch (r) {
-        AppRoute.dashboard => Icons.grid_view_rounded,
-        AppRoute.calendar => Icons.calendar_month_rounded,
-        AppRoute.notes => Icons.description,
-        AppRoute.done => Icons.check_circle_rounded,
-        AppRoute.profile => Icons.person_rounded,
+  IconData _fillIcon(AppTab t) => switch (t) {
+        AppTab.dashboard => Icons.grid_view_rounded,
+        AppTab.routine => Icons.calendar_month_rounded,
+        AppTab.focus => Icons.timer_rounded,
+        AppTab.notes => Icons.description,
+        AppTab.profile => Icons.person_rounded,
       };
 
-  IconData _outlineIcon(AppRoute r) => switch (r) {
-        AppRoute.dashboard => Icons.grid_view_outlined,
-        AppRoute.calendar => Icons.calendar_month_outlined,
-        AppRoute.notes => Icons.description_outlined,
-        AppRoute.done => Icons.check_circle_outline_rounded,
-        AppRoute.profile => Icons.person_outline_rounded,
+  IconData _outlineIcon(AppTab t) => switch (t) {
+        AppTab.dashboard => Icons.grid_view_outlined,
+        AppTab.routine => Icons.calendar_month_outlined,
+        AppTab.focus => Icons.timer_outlined,
+        AppTab.notes => Icons.description_outlined,
+        AppTab.profile => Icons.person_outline_rounded,
       };
 
-  String _label(AppRoute r) => switch (r) {
-        AppRoute.dashboard => 'Dashboard',
-        AppRoute.calendar => 'Calendar',
-        AppRoute.notes => 'Notes',
-        AppRoute.done => 'Done',
-        AppRoute.profile => 'Profile',
+  String _label(AppTab t) => switch (t) {
+        AppTab.dashboard => 'Dashboard',
+        AppTab.routine => 'Routine',
+        AppTab.focus => 'Focus',
+        AppTab.notes => 'Notes',
+        AppTab.profile => 'Profile',
       };
+}
+
+/// One nav item: icon scale-pops on activation, label fades in.
+class _NavItem extends StatefulWidget {  const _NavItem({
+    required this.active,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool active;
+  final Widget icon;
+  final Widget label;
+  final VoidCallback onTap;
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pop;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _pop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _pop, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(covariant _NavItem old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !old.active) {
+      _pop.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkResponse(
+      onTap: widget.onTap,
+      containedInkWell: true,
+      highlightShape: BoxShape.rectangle,
+      splashColor: Theme.of(context)
+          .extension<AppColors>()!
+          .accent
+          .withValues(alpha: 0.12),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ScaleTransition(scale: _scale, child: widget.icon),
+            const SizedBox(height: 5),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: widget.active ? 1.0 : 0.55,
+              child: widget.label,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -7,6 +7,10 @@ class UserSettings {
   final int examReminderDays;
   final bool notificationsEnabled;
   final AppThemeMode theme;
+  final int weekStartDay;
+  final String dashboardView;
+  final int minAttendancePercent;
+  final int dailyStudyGoalMinutes;
 
   UserSettings({
     required this.name,
@@ -15,6 +19,10 @@ class UserSettings {
     this.examReminderDays = 3,
     this.notificationsEnabled = true,
     this.theme = AppThemeMode.light,
+    this.weekStartDay = DateTime.saturday,
+    this.dashboardView = 'active',
+    this.minAttendancePercent = 75,
+    this.dailyStudyGoalMinutes = 0,
   });
 
   factory UserSettings.defaults() => UserSettings(
@@ -23,6 +31,10 @@ class UserSettings {
     examReminderDays: 3,
     notificationsEnabled: true,
     theme: AppThemeMode.light,
+    weekStartDay: DateTime.saturday,
+    dashboardView: 'active',
+    minAttendancePercent: 75,
+    dailyStudyGoalMinutes: 0,
   );
 
   UserSettings copyWith({
@@ -32,6 +44,10 @@ class UserSettings {
     int? examReminderDays,
     bool? notificationsEnabled,
     AppThemeMode? theme,
+    int? weekStartDay,
+    String? dashboardView,
+    int? minAttendancePercent,
+    int? dailyStudyGoalMinutes,
   }) {
     return UserSettings(
       name: name ?? this.name,
@@ -41,6 +57,11 @@ class UserSettings {
       examReminderDays: examReminderDays ?? this.examReminderDays,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       theme: theme ?? this.theme,
+      weekStartDay: weekStartDay ?? this.weekStartDay,
+      dashboardView: dashboardView ?? this.dashboardView,
+      minAttendancePercent: minAttendancePercent ?? this.minAttendancePercent,
+      dailyStudyGoalMinutes:
+          dailyStudyGoalMinutes ?? this.dailyStudyGoalMinutes,
     );
   }
 
@@ -51,6 +72,10 @@ class UserSettings {
     'examReminderDays': examReminderDays,
     'notificationsEnabled': notificationsEnabled,
     'theme': theme.name,
+    'weekStartDay': weekStartDay,
+    'dashboardView': dashboardView,
+    'minAttendancePercent': minAttendancePercent,
+    'dailyStudyGoalMinutes': dailyStudyGoalMinutes,
   };
 
   factory UserSettings.fromJson(Map<String, dynamic> j) => UserSettings(
@@ -62,5 +87,9 @@ class UserSettings {
     theme: j['theme'] != null
         ? AppThemeMode.values.byName(j['theme'])
         : AppThemeMode.light,
+    weekStartDay: (j['weekStartDay'] as num?)?.toInt() ?? DateTime.saturday,
+    dashboardView: j['dashboardView'] ?? 'active',
+    minAttendancePercent: (j['minAttendancePercent'] as num?)?.toInt() ?? 75,
+    dailyStudyGoalMinutes: (j['dailyStudyGoalMinutes'] as num?)?.toInt() ?? 0,
   );
 }

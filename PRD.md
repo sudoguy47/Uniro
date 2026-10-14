@@ -19,23 +19,36 @@ Uniro is an **offline-first campus task + notes app for students**. No login, no
 
 ## 2. App map & navigation
 
-Bottom tab bar with **5 tabs** (icons + labels, haptic on tap):
+Bottom tab bar with **5 tabs** (icons + labels, selection-click haptic on tap, selected icon scale-pops 1.0→1.15→1.0 in 200ms, label fades in; center Focus tab always accent and slightly larger at 30dp):
 
 | # | Tab | Label | Icon (active / inactive) |
 |---|-----|-------|--------------------------|
 | 0 | Dashboard | Dashboard | grid_view rounded / outlined |
-| 1 | Calendar | Calendar | calendar_month rounded / outlined |
-| 2 | Notes | Notes | description filled / outlined |
-| 3 | Done | Done | check_circle rounded / outlined |
+| 1 | Routine | Routine | calendar_month rounded / outlined |
+| 2 | Focus | Focus | timer rounded / outlined (placeholder screen until the timer is built) |
+| 3 | Notes | Notes | description filled / outlined |
 | 4 | Profile | Profile | person rounded / outlined |
+
+- Tabs are named `AppTab` enum values (no magic indexes); `AppShell.openTab()` allows notification taps/deep links to switch. No tab index is persisted anywhere, so no migration exists.
+- The old Calendar tab is removed (`calendar_screen.dart` + `monthly_calendar.dart` deleted — verified unused elsewhere). The Done tab is removed; its content lives in the Dashboard Active|Completed toggle (DoneScreen widget reused, built lazily, kept alive).
 
 - Tab switching = instant page jump (no swipe gesture between tabs, no animation).
 - When the New-Task sheet is open, the bottom bar slides away (200ms).
+- Dashboard header "+" popover (Create task / Add class routine) replaces the old FABs — there are no duplicate create buttons. "+" rotates 45° while open; tap-outside/Back closes.
 - Bar: top hairline border + soft upward shadow; height 58dp + system inset.
 - All 5 pages are kept alive (no reload when switching tabs).
 - App state (tasks+settings) persists on background/close; notes flush on background.
 
 ---
+
+## 3. Focus (tab 2) — flip-clock Pomodoro
+
+- Premium flip-clock UI (no scrolling): phase chip + sliding 3-segment durations (long-press edits), 2×2 split-flap digit cards (150ms + 190ms halves, perspective, shade overlay; 40ms stagger on bulk changes; 120ms crossfade on reduce-motion), pulsing colon dots, session mini-cards, START pill, reset ring-button, 4-icon mode pill above the nav. Small screens (<640dp) shrink the card aspect; landscape lays the four cards in one row.
+- Modes: Pomodoro (focus + auto breaks), One block (single countdown), Stopwatch (count-up, HH:MM past 99:59). Breaks auto-start per settings (default: breaks on, next-focus off).
+- Engine (`FocusState`): wall-clock endTime persisted in `ct_focus_engine`; restore on launch advances phases ended away (records elapsed focus blocks, max 30 steps); 1s ticker drives ONLY per-digit ValueNotifiers (nothing else rebuilds); phase-end notification id `800001` (silent fallback without permission); sessions recorded on completion or finish-early ≥5 min / stopwatch-stop ≥5 min.
+- Task/Course linking sheet with search (chip shows "FOCUS #n · CODE"); summary sheet after recorded sessions (tree visual, today totals, Take-a-break / Mark-task-complete? / Done); duration editor + settings sheets (long-break cadence 2–8, auto toggles, haptics → Profile, strict disabled, study-log link → Study Log step); mini "Focus MM:SS" bar above nav on other tabs.
+- Haptics via existing `PremiumHaptics` (tick=select, click=tap, confirm/warning/heavy=confirm). No Strict mode / lock / DND layer (explicitly removed from scope).
+- Completed focus blocks recorded as `FocusSession` (id, date, startedAt ISO, minutes, optional courseId/taskId, isManual) in `ct_focus_sessions`, trimmed to the last 500 — the source the Study Log aggregates.
 
 ## 3. Onboarding (first launch only)
 
@@ -56,7 +69,10 @@ Chrome (all slides): "Uniro" wordmark top-left (27sp, 900 weight); dot indicator
 
 ## 4. Dashboard (tab 0)
 
-Scrollable column: sticky header → hero carousel → weekly load → filter chips → pending task list. FAB (56dp circle, "+" icon) bottom-right opens New-Task sheet.
+Scrollable Active feed / lazily-built Completed view (DoneScreen reused) behind an Active|Completed segmented toggle that sits after the Weekly load chart in the scroll flow (top of the Completed view). Choice persisted in settings. Header adds a "+" quick-create popover.
+
+### 4.0 Next-class card (top of Active feed, hidden when nothing left today)
+- Dark card: "NEXT CLASS" caps, course code·name, 12h time range + room, live pill ("in 45 min" / "Now · ends in 20 min", refreshed by a 1-minute Timer owned by the card). Tap → Routine tab.
 
 ### 4.1 Header (fixed 66dp text zone — height NEVER changes)
 - Row: text block (left, vertically centered) + avatar circle 48dp (right, taps → Profile tab).
@@ -78,12 +94,8 @@ Scrollable column: sticky header → hero carousel → weekly load → filter ch
 - Shows first **6 pending tasks** (sorted by due date). Card = colored bg by urgency (see §10.3) + title (white bold 17sp, 1 line) + type pill (translucent white) + optional description (2 lines, 70% white) + bottom row (calendar icon + due date; urgency pill, white bg).
 - Dots below (active 16dp accent pill / 6dp border dots). Empty → section hidden.
 
-### 4.3 Weekly Load Pager (swipeable, 2 pages, 5s auto-cycle + dots)
-- Page 1 = Weekly Load chart (unchanged UI, §4.3 below).
-- Page 2 = Class Routine week-timetable: SUN–SAT rows vs hour axis (08–22 min, stretches to fit, 12h labels), blocks positioned by start with width ∝ duration (44px floor, clipped at next class), subject + 12h range ("3:00–4:20 PM") + room pin when ≥84px wide; today row tinted; tap block → edit.
-- Add/edit sheet: subject (required), day chips Mo–Su (default today), start/end time pickers (default 09:00–10:30, end-after-start enforced), optional room.
-### 4.4 Weekly load (pager page 1)
-- Card with 7 bars (Mo–Su from Monday). Bar height ∝ count (min 12dp, empty = 8dp stub). Colors: empty = `chartBarEmpty`, normal = red, selected-day = accent with 2dp accent border.
+### 4.3 Weekly load (single chart)
+- Card with 7 bars ordered from the week-start setting (default Saturday). Bar height ∝ count (min 12dp, empty = 8dp stub). Colors: empty = `chartBarEmpty`, normal = red, selected-day = accent with 2dp accent border.
 - Tapping a bar selects that day: floating count chip appears (`"N task(s)"` on dark pill), label turns accent. Header row: "Weekly load" left + "{N} due this week" right. Footer hint: "Tap a bar to filter that day".
 
 ### 4.4 Filter chips
@@ -96,18 +108,25 @@ Scrollable column: sticky header → hero carousel → weekly load → filter ch
 
 ---
 
-## 5. Calendar (tab 1)
-
-- Top segmented toggle: **Monthly | Weekly** (pill, 44dp, active segment = dark pill).
-- Prev/today-month/next chevron row: monthly shows `MMMM yyyy`; weekly shows `Week of MMM d`.
-- **Monthly view:** 7-col grid (S M T W T F S header), 44dp cells: day number in 30dp rounded box (accent fill if selected, 2dp accent border if today), up to 3 urgency/type color dots under it. Tap selects date.
-- **Weekly view:** reuses Weekly Load chart, bound to selected day.
-- Below: `Tasks for {MMM d, yyyy}` + `{N} tasks`; task cards (completed show accent-filled check + delete icon). Same FAB → New-Task sheet pre-filled with selected date.
-- Date math: week starts **Monday** everywhere.
+### 4.0 Next-class card (top of Active feed, hidden when nothing left today)
+- Dark card: "NEXT CLASS" caps, course code·name, 12h time range + room, live pill ("in 45 min" / "Now · ends in 20 min", refreshed by a 1-minute Timer owned by the card). Tap → Routine tab.
 
 ---
 
-## 6. Notes (tab 2)
+## 5. Routine (tab 1)
+
+- Header: "Routine" + accent "+ Add class" pill.
+- 7-day selector ordered from the week-start setting (default Saturday): chips with short name + date, today gets an accent ring, selected day = 200ms animated dark pill.
+- Day cards: 12h time range, course code·name with course color bar, room + teacher line. Running class → accent "Now" badge; finished/past → dimmed (+ attendance check via hook, wired in the attendance step).
+- Tap → sheet: class info + Edit / Delete (confirm dialog, shrink+fade-out, 4s undo SnackBar) / disabled "Attendance — coming next" row.
+- Entrance: fade + 12px slide-up, 30ms stagger on day change (skipped on reduce-motion). Empty day: icon + "No classes this day" + Add button.
+- Add/edit form (bottom sheet): course picker with inline New-course form (name*, code, teacher, room, credits, 8-color palette); weekday multi-select chips (Mo–Su, one slot per day; edit = single); start/end pickers (default 09:00–10:30); room (falls back to course room); reminder dropdown None/5/10/15/30 (default 15). Validates course set, day set, end-after-start. Overlap with another class → warning dialog with the conflicting class, Save-anyway/Cancel.
+- Courses managed in Profile > Courses (add/edit/delete with counts). Deleting a course deletes its classes + reminders and unlinks its tasks/notes (explicit confirm).
+- Data: `Course` (id, name, code?, colorTag?, teacher?, room?, credits?) and `ClassSlot` (id, courseId, weekday 1–7, start/end minutes, room?, reminderMinutesBefore? default 15) in `ct_courses`/`ct_slots` (400ms debounce, loaded pre-first-frame). One-time migration converts the old dashboard mini-routine entries (then deletes the old key). Tasks/notes carry optional `courseId` (old JSON valid); New-Task sheet has an optional Course row; deleting a course nulls the links.
+
+---
+
+## 6. Notes (tab 3)
 
 ### 6.1 Notes list
 - Header "Notes" + search icon → expanding search field (autofocus, 200ms debounce, matches title + block text, clears on close).
@@ -130,9 +149,9 @@ Scrollable column: sticky header → hero carousel → weekly load → filter ch
 
 ---
 
-## 7. Done (tab 3)
+## 7. Completed (Dashboard toggle — ex Done tab)
 
-- "Completed" (28sp/800) + "{N} tasks completed".
+- Same content as the old Done tab: "Completed" + "{N} tasks completed".
 - Completed cards (accent-filled check). Tap check = **uncomplete** (returns to pending); trash icon = **permanent delete** (no undo).
 - Empty state: check-circle outline + "No completed tasks yet".
 
@@ -142,18 +161,20 @@ Scrollable column: sticky header → hero carousel → weekly load → filter ch
 
 Cards on 16dp page padding:
 1. **Profile card:** 80dp avatar (tap → gallery pick, downscaled to 512px max, 80% JPEG; initial-letter fallback on accent circle) + camera badge; name row (tap → "Edit Name" dialog, non-empty enforced); caption "Stored on this device".
-2. **Reminders card:** "Assignment & CT" day-stepper (default 2) and "Exam, Viva & Project" stepper (default 3), range 0–30, bounce animation; divider rows; **Notifications Enabled** switch (off = cancel ALL notifications incl. daily; on = reschedule everything).
-3. **App Theme card:** Light / System / Dark segmented buttons (140ms animated).
+2. **Reminders card:** "Assignment & CT" day-stepper (default 2) and "Exam, Viva & Project" stepper (default 3), range 0–30, bounce animation; divider rows; **Notifications Enabled** switch (off = cancel ALL notifications incl. daily; on = prompt permission + reschedule everything).
+3. **Courses card:** count + chevron → Courses screen.
+4. **App Theme card:** Light / System / Dark segmented buttons (140ms animated).
 
 ---
 
-## 9. New-Task sheet (from Dashboard & Calendar FABs)
+## 9. New-Task sheet (Dashboard "+" popover → Create task)
 
 - Overlay sheet, 88% max height, 220ms slide-up + fade, drag handle, "New Task" title + ✕; backdrop tap / system back closes (reverse animation). Floating **Save Task** pill button (52dp, accent glow shadow) always visible above keyboard.
 - Fields:
   - **TITLE** (required — Save disabled/no-op if blank): hint "e.g. Algorithms Class Test".
   - **DESCRIPTION** (optional, 2–3 lines): hint "Optional notes, syllabus, room number…".
   - **CATEGORY / TYPE** (48dp field → bottom sheet, max 72% height, **scrollable** list, drag handle, check on current): Assignment, Exam / Final, Class Test (CT), Viva Voce, Presentation, Lab / Class, Project, Other / Lecture, **Custom** (tune icon).
+  - **COURSE (OPTIONAL)** (48dp field → bottom sheet, None default): links the task to a course (per-course stats, study log).
   - **DUE DATE** + **DUE TIME** side by side (system date/time pickers; date range past-1y → +2y; time defaults 09:00). "Set specific reminder time" switch enables time.
   - **PRIORITY**: High / Medium (default) / Low segmented (44dp, accent border when active).
   - **NOTIFICATIONS & REMINDERS**: chips of added reminders (accent, ✕ to remove) + "Add Reminder" dashed button → sheet with radio list: **At time of event / 1 hour / 1 day / 3 days / 1 week / Custom (N days before, stepper 1–30)** + "Add Reminder" button. Multiple reminders per task allowed.
@@ -164,7 +185,7 @@ Cards on 16dp page padding:
 ## 10. Task domain rules
 
 ### 10.1 Task fields
-`id` (uuid-ish hex), `title*`, `description?`, `type` (9 enums), `dueDate` (`yyyy-MM-dd`), `dueTime?` (`HH:mm`), `hasTime` (bool), `priority` (high/medium/low), `status` (pending/completed), `reminders[]` (`id`, `type`, `customDays?`, `notificationId?`), `createdAt` (ISO), `completedAt?` (ISO).
+`id` (uuid-ish hex), `title*`, `description?`, `type` (9 enums), `dueDate` (`yyyy-MM-dd`), `dueTime?` (`HH:mm`), `hasTime` (bool), `priority` (high/medium/low), `status` (pending/completed), `reminders[]` (`id`, `type`, `customDays?`, `notificationId?`), `createdAt` (ISO), `completedAt?` (ISO), `courseId?` (nullable link).
 
 ### 10.2 Reminder fire times (relative to due datetime, default 09:00 if no time)
 atTime = due datetime; oneHour = −1h; oneDay = −1d; threeDays = −3d; oneWeek = −7d; custom = −N days. Past times are skipped. Completing a task cancels its notifications; uncompleting reschedules; deleting cancels.
@@ -188,7 +209,8 @@ Pending = status pending (+ active type filter), sorted by dueDate asc. Hero = f
 - Channel: id `campus_tracker_reminders`, name "Task Reminders", desc "Notifications and scheduled reminders for campus tasks, classes, and exams", importance MAX, sound+vibration+badge, icon = launcher icon.
 - Permissions: `POST_NOTIFICATIONS` (33+), `SCHEDULE_EXACT_ALARM` + `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `VIBRATE`.
 - Task notifications: exact alarms (`setExactAndAllowWhileIdle` / `SCHEDULE_EXACT_ALARM`), title `[TYPE] {title}`, body `Due on {date}[ at {time}] ({reminder})`. Stable int id = hash(taskId [+ reminderId]) — same id overwrites on reschedule. Tap payload = taskId (open app; deep-link to task optional).
-- **Daily greeting:** id `900001`, fires **06:00 local daily** (repeating; if 6 AM passed, next day), title `Rise and shine, {FullName}! ☀️`, body = that day's entry from the same 20-quote rotation as the header (§4.1) — the quote you wake up to is the quote on your dashboard all day. Re-scheduled on every app start (covers reboot), on name change, on settings change; cancelled when master toggle off.
+- **Daily greeting:** id `900001`, fires **06:00 local daily** (repeating; if 6 AM passed, next day), title `Rise and shine, {FullName}! ☀️`, body = that day's entry from the same 20-quote rotation as the header (§4.1) — the quote you wake up to is the quote on your dashboard all day.
+- **Class reminders:** ids `500000–599999` (persisted counter, wraps; map `slotId|yyyy-MM-dd → id` in `ct_class_notif_map`). One notification per slot occurrence for the next 14 days (no infinite repeats): title `{code} in {N} min`, body `{course} · {12h range} · {room}`, payload `class|<slotId>|<date>`. Full rebuild on class/course change + every launch (covers reboot/timezone); per-slot cancel on edit/delete. Skipped when master toggle off or reminder = None. Exact-alarm failures degrade silently per slot. Re-scheduled on every app start (covers reboot), on name change, on settings change; cancelled when master toggle off.
 - Native mapping: `AlarmManager.setExactAndAllowWhileIdle` + `BroadcastReceiver` (re-schedule all on `BOOT_COMPLETED`), or WorkManager periodic + exact one-shots. Notification tap → `MainActivity` with task id extra.
 
 ---
@@ -228,8 +250,10 @@ Motion: micro 140ms, fast 200ms, sheet 220–280ms, header swap 250ms, carousel 
 | Flutter | Native equivalent |
 |---|---|
 | `SharedPreferences` `ct_tasks` (JSON array of Task) | Room table `tasks` (columns = §10.1; `reminders` = embedded JSON string) |
-| `ct_settings` (JSON UserSettings) | DataStore Preferences: `name` (default "Student"), `avatarUri?`, `assignmentReminderDays` (2), `examReminderDays` (3), `notificationsEnabled` (true), `theme` (LIGHT) |
-| `ct_routine` (JSON array of ClassRoutineEntry) | Room table `class_routine` (`id`, `subjectName`, `dayOfWeek` 0–6, `startTime`/`endTime` `HH:mm`, nullable `room`) + DAO/Repository |
+| `ct_settings` (JSON UserSettings) | DataStore Preferences: `name` (default "Student"), `avatarUri?`, `assignmentReminderDays` (2), `examReminderDays` (3), `notificationsEnabled` (true), `theme` (LIGHT), `weekStartDay` (6 = Saturday), `dashboardView` ("active"), `minAttendancePercent` (75), `dailyStudyGoalMinutes` (0 = off) |
+| `ct_routine` | MIGRATED on first launch into courses+slots, then deleted |
+| `ct_courses` (JSON array of Course) | Room table `courses` |
+| `ct_slots` (JSON array of ClassSlot) | Room table `class_slots` |
 | `ct_onboarding_done` (bool) | DataStore `onboarding_done` |
 | `uniro_notes_v1` (JSON array of Note) | Room tables `notes` + `blocks` (or JSON-in-DataStore; Room preferred) |
 | `uniro_note_folders_v1` (string list) | DataStore string-set, default [Personal, Study, Work] |

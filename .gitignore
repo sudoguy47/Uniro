@@ -30,6 +30,10 @@ android/build/
 android/.gradle/
 android/app/build/
 android/local.properties
+android/key.properties
+*.jks
+*.keystore
+*.env
 ios/Pods/
 ios/.symlinks/
 linux/build/

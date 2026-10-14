@@ -30,7 +30,9 @@ class _ReminderPickerSheetState extends State<ReminderPickerSheet> {
           ReminderType.atTime => 'At time of event',
           ReminderType.oneHour => '1 hour before',
           ReminderType.oneDay => '1 day before',
+          ReminderType.twoDays => '2 days before',
           ReminderType.threeDays => '3 days before',
+          ReminderType.sevenDays => '7 days before',
           ReminderType.oneWeek => '1 week before',
           ReminderType.custom => 'Custom (days before)',
         };

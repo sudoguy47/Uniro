@@ -103,7 +103,7 @@ class NotesState extends ChangeNotifier {
     _store.saveNotes(_notes);
   }
 
-  Note createNote({BlockType firstBlockType = BlockType.paragraph}) {
+  Note createNote({BlockType firstBlockType = BlockType.paragraph, String? courseId}) {
     final now = DateTime.now();
     final note = Note(
       id: generateNoteId(),
@@ -113,6 +113,7 @@ class NotesState extends ChangeNotifier {
       blocks: [NoteBlock(id: generateNoteId(), type: firstBlockType)],
       createdAt: now,
       updatedAt: now,
+      courseId: courseId,
     );
     _notes = [note, ..._notes];
     _store.saveNotes(_notes);
@@ -176,6 +177,21 @@ class NotesState extends ChangeNotifier {
     _notes = _notes.map((n) => n.id == id
         ? n.copyWith(folder: folder, updatedAt: DateTime.now())
         : n).toList();
+    _store.saveNotes(_notes);
+    notifyListeners();
+  }
+
+  /// Unlinks a deleted course from all notes (notes themselves are kept).
+  void unlinkCourse(String courseId) {
+    var changed = false;
+    _notes = _notes.map((n) {
+      if (n.courseId == courseId) {
+        changed = true;
+        return n.copyWith(clearCourseId: true, updatedAt: DateTime.now());
+      }
+      return n;
+    }).toList();
+    if (!changed) return;
     _store.saveNotes(_notes);
     notifyListeners();
   }

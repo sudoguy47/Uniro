@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import '../models/class_routine.dart';
 import '../models/task.dart';
 import '../models/settings.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import 'package:flutter/services.dart';
-import '../domain/preloaded_tasks.dart';
 
 mixin AppCore on ChangeNotifier {
   static const _widgetChannel = MethodChannel('com.example.uniro1/widget');
@@ -16,7 +14,6 @@ mixin AppCore on ChangeNotifier {
   static final DateFormat _ymdFmt = DateFormat('yyyy-MM-dd');
   // ── State (RAM) ──────────────────────────────────────────────────────────
   List<Task> _tasks = [];
-  List<ClassRoutineEntry> _routine = [];
   UserSettings _settings = UserSettings.defaults();
   TaskType? _activeFilter; // null = All
   bool _isLoaded = false;
@@ -27,7 +24,6 @@ mixin AppCore on ChangeNotifier {
   List<Task>? _cachedPendingTasks;
   List<Task>? _cachedHeroTasks;
   List<Task>? _cachedCompletedTasks;
-  List<ClassRoutineEntry>? _cachedRoutine;
   final Map<String, Map<String, int>> _cachedWeeklyLoad = {};
 
   void _clearComputedCaches() {
@@ -35,7 +31,6 @@ mixin AppCore on ChangeNotifier {
     _cachedPendingTasks = null;
     _cachedHeroTasks = null;
     _cachedCompletedTasks = null;
-    _cachedRoutine = null;
     _cachedWeeklyLoad.clear();
   }
 
@@ -76,8 +71,6 @@ mixin AppCore on ChangeNotifier {
     _saveDebounce = null;
     LocalStore.instance.save('tasks', _tasks.map((t) => t.toJson()).toList());
     LocalStore.instance.save('settings', _settings.toJson());
-    LocalStore.instance.save(
-        'routine', _routine.map((e) => e.toJson()).toList());
     _widgetChannel.invokeMethod('updateWidget').catchError((_) {});
   }
 
@@ -89,19 +82,13 @@ mixin AppCore on ChangeNotifier {
           .map((j) => Task.fromJson(Map<String, dynamic>.from(j as Map)))
           .toList();
     } else {
-      // First launch or empty state: seed with realistic preloaded tasks
-      _tasks = getPreloadedTasks();
+      // Fresh start: no preloaded demo data — the user adds their own.
+      _tasks = [];
       persistNow();
     }
     final rawSettings = LocalStore.instance.load('settings');
     if (rawSettings != null) {
       _settings = UserSettings.fromJson(Map<String, dynamic>.from(rawSettings as Map));
-    }
-    final rawRoutine = LocalStore.instance.load('routine');
-    if (rawRoutine is List) {
-      _routine = rawRoutine
-          .map((j) => ClassRoutineEntry.fromJson(Map<String, dynamic>.from(j as Map)))
-          .toList();
     }
     _clearComputedCaches();
     _isLoaded = true;
@@ -168,39 +155,17 @@ mixin AppCore on ChangeNotifier {
     _persist();
   }
 
-  // ── Class Routine (dashboard pager page 2) ─────────────────────────────
-  /// Sorted Mon→Sun, then by start time. Unmodifiable snapshot.
-  List<ClassRoutineEntry> get classRoutine {
-    if (_cachedRoutine != null) return _cachedRoutine!;
-    final list = List.of(_routine)
-      ..sort((a, b) {
-        final d = a.dayOfWeek.compareTo(b.dayOfWeek);
-        if (d != 0) return d;
-        return ClassRoutineEntry.minutesOf(a.startTime)
-            .compareTo(ClassRoutineEntry.minutesOf(b.startTime));
-      });
-    return _cachedRoutine = List.unmodifiable(list);
-  }
-
-  void addRoutineEntry(ClassRoutineEntry entry) {
-    _routine.add(entry);
-    _cachedRoutine = null;
-    notifyListeners();
-    _persist();
-  }
-
-  void updateRoutineEntry(String id, ClassRoutineEntry updated) {
-    final i = _routine.indexWhere((e) => e.id == id);
-    if (i < 0) return;
-    _routine[i] = updated;
-    _cachedRoutine = null;
-    notifyListeners();
-    _persist();
-  }
-
-  void deleteRoutineEntry(String id) {
-    _routine.removeWhere((e) => e.id == id);
-    _cachedRoutine = null;
+  /// Unlinks a deleted course from all tasks (tasks themselves are kept).
+  void unlinkCourse(String courseId) {
+    var changed = false;
+    for (var i = 0; i < _tasks.length; i++) {
+      if (_tasks[i].courseId == courseId) {
+        _tasks[i] = _tasks[i].copyWith(clearCourseId: true);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    _clearComputedCaches();
     notifyListeners();
     _persist();
   }
