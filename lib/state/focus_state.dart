@@ -79,16 +79,28 @@ class FocusState extends ChangeNotifier {
 
   Future<void> load() async {
     if (_loaded) return;
-    final raw = LocalStore.instance.load(_sessionsKey);
-    if (raw is List) {
-      try {
-        _sessions = raw
-            .map((j) => FocusSession.fromJson(
-                Map<String, dynamic>.from(j as Map)))
-            .toList();
-      } catch (_) {
-        _sessions = [];
+    try {
+      final raw = LocalStore.instance.load(_sessionsKey);
+      if (raw is List) {
+        final parsed = <FocusSession>[];
+        for (final j in raw) {
+          try {
+            if (j is Map) {
+              parsed.add(FocusSession.fromJson(
+                  Map<String, dynamic>.from(j)));
+            } else {
+              LocalStore.instance.markRecovery();
+            }
+          } catch (_) {
+            LocalStore.instance.markRecovery();
+            continue;
+          }
+        }
+        _sessions = parsed;
       }
+    } catch (_) {
+      _sessions = [];
+      LocalStore.instance.markRecovery();
     }
     _loadEngine();
     _loaded = true;

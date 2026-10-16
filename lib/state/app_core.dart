@@ -8,7 +8,7 @@ import '../services/notification_service.dart';
 import 'package:flutter/services.dart';
 
 mixin AppCore on ChangeNotifier {
-  static const _widgetChannel = MethodChannel('com.example.uniro1/widget');
+  static const _widgetChannel = MethodChannel('dev.sudoguy.uniro/widget');
   // Shared formatters — DateFormat construction parses locale skeletons and
   // is surprisingly expensive; one static instance serves all calls.
   static final DateFormat _ymdFmt = DateFormat('yyyy-MM-dd');
@@ -75,20 +75,53 @@ mixin AppCore on ChangeNotifier {
   }
 
   // ── Boot (GymMane loadFromStore pattern with Preloaded Seed Data) ─────────
+  // Never throws: corrupt JSON is already backed up by LocalStore.load;
+  // malformed list items are skipped individually.
   void loadFromStore() {
-    final rawTasks = LocalStore.instance.load('tasks');
-    if (rawTasks is List && rawTasks.isNotEmpty) {
-      _tasks = rawTasks
-          .map((j) => Task.fromJson(Map<String, dynamic>.from(j as Map)))
-          .toList();
-    } else {
-      // Fresh start: no preloaded demo data — the user adds their own.
+    try {
+      final rawTasks = LocalStore.instance.load('tasks');
+      if (rawTasks is List && rawTasks.isNotEmpty) {
+        final parsed = <Task>[];
+        for (final j in rawTasks) {
+          try {
+            if (j is Map) {
+              parsed.add(
+                  Task.fromJson(Map<String, dynamic>.from(j)));
+            } else {
+              LocalStore.instance.markRecovery();
+            }
+          } catch (_) {
+            LocalStore.instance.markRecovery();
+            continue;
+          }
+        }
+        _tasks = parsed;
+        if (_tasks.isEmpty) {
+          persistNow();
+        }
+      } else {
+        // Fresh start: no preloaded demo data — the user adds their own.
+        _tasks = [];
+        persistNow();
+      }
+      final rawSettings = LocalStore.instance.load('settings');
+      if (rawSettings != null) {
+        try {
+          if (rawSettings is Map) {
+            _settings = UserSettings.fromJson(
+                Map<String, dynamic>.from(rawSettings));
+          } else {
+            LocalStore.instance.markRecovery();
+          }
+        } catch (_) {
+          LocalStore.instance.markRecovery();
+          _settings = UserSettings.defaults();
+        }
+      }
+    } catch (_) {
       _tasks = [];
-      persistNow();
-    }
-    final rawSettings = LocalStore.instance.load('settings');
-    if (rawSettings != null) {
-      _settings = UserSettings.fromJson(Map<String, dynamic>.from(rawSettings as Map));
+      _settings = UserSettings.defaults();
+      LocalStore.instance.markRecovery();
     }
     _clearComputedCaches();
     _isLoaded = true;
@@ -182,10 +215,11 @@ mixin AppCore on ChangeNotifier {
     _settings = s;
     notifyListeners();
     LocalStore.instance.save('settings', s.toJson());
-    // Keep the daily 6 AM greeting in sync with name + toggle.
+    // Keep the daily 6 AM greeting in sync with name + toggle + tasks.
     unawaited(NotificationService.instance.scheduleDailyGreeting(
       name: s.name,
       enabled: s.notificationsEnabled,
+      tasks: _tasks,
     ));
   }
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
@@ -7,6 +7,7 @@ import '../models/course.dart';
 import '../state/app_state.dart';
 import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
+import 'battery_guide.dart';
 import 'ui_kit.dart';
 import 'reminder_picker_sheet.dart';
 
@@ -121,7 +122,10 @@ class _NewTaskSheetState extends State<NewTaskSheet>
     );
 
     context.read<AppState>().addTask(task);
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
+    if (_reminders.isNotEmpty) {
+      BatteryHint.noteReminderCreated();
+    }
     _close();
   }
 
@@ -715,7 +719,7 @@ class _CourseField extends StatelessWidget {
 
     return GestureDetector(
       onTap: () async {
-        HapticFeedback.selectionClick();
+        PremiumHaptics.select();
         final picked = await showModalBottomSheet<String?>(
           context: context,
           backgroundColor: c.cardBg,

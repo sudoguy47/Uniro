@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/settings.dart';
+import '../services/diagnostics.dart';
+import '../services/device_channel.dart';
+import '../services/error_log.dart';
 import '../services/update_service.dart';
 import '../state/app_state.dart';
+import '../state/notes_state.dart';
 import '../state/routine_state.dart';
+import '../widgets/battery_guide.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
@@ -28,15 +34,30 @@ class _ProfileScreenState extends State<ProfileScreen>
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickAvatar() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
-    );
-    if (image != null && mounted) {
-      final app = context.read<AppState>();
-      app.updateSettings(app.settings.copyWith(avatarUri: image.path));
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 80,
+      );
+      if (!mounted) return;
+      if (image != null) {
+        final app = context.read<AppState>();
+        app.updateSettings(app.settings.copyWith(avatarUri: image.path));
+      }
+    } on PlatformException catch (e) {
+      debugPrint('avatar picker notice: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open the photo picker.")),
+      );
+    } catch (e) {
+      debugPrint('avatar picker notice: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't open the photo picker.")),
+      );
     }
   }
 
@@ -146,21 +167,28 @@ class _ProfileScreenState extends State<ProfileScreen>
                     const SizedBox(height: 12),
                     GestureDetector(
                       onTap: () => _editNameDialog(context, s),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            s.name,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: c.textPrimary,
-                            ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                s.name,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: c.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(Icons.edit_outlined,
+                                  size: 16, color: c.textSecondary),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.edit_outlined,
-                              size: 16, color: c.textSecondary),
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -298,6 +326,71 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                       ],
                     ),
+                    Divider(height: 24, color: c.borderLight),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Gallery & Storage Access',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: c.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Profile photo & avatar picker',
+                                style: TextStyle(
+                                    fontSize: 13, color: c.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: GestureDetector(
+                              onTap: _pickAvatar,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: c.cardBgRaised,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: c.border),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.photo_library_outlined,
+                                        size: 16, color: c.accent),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Choose Photo',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: c.accent,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const _GalleryPermissionTile(),
+                    const Divider(height: 16),
+                    const BatteryGuideCard(),
                   ],
                 ),
               ),
@@ -339,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         return Expanded(
                           child: GestureDetector(
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PremiumHaptics.select();
                               context
                                   .read<AppState>()
                                   .updateSettings(s.copyWith(theme: mode));
@@ -373,6 +466,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ],
                 ),
               ),
+              const SizedBox(height: 16),
+
+              // Help: diagnostics for testers + local log clearing.
+              const _HelpCard(),
               const SizedBox(height: 100),
             ],
           ),
@@ -485,47 +582,158 @@ class _UpdateCardState extends State<_UpdateCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'App updates',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: c.textPrimary,
+      child: LayoutBuilder(builder: (context, cons) {
+        final btnW = (cons.maxWidth * 0.44).clamp(110.0, 190.0);
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'App updates',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: c.textPrimary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _version.isEmpty
-                      ? 'Check for new releases'
-                      : 'Installed v$_version',
-                  style:
-                      TextStyle(fontSize: 13, color: c.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton(
-            onPressed: _checking
-                ? null
-                : () {
-                    HapticFeedback.selectionClick();
-                    _manualCheck();
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: c.accent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 2),
+                  Text(
+                    _version.isEmpty
+                        ? 'Check for new releases'
+                        : 'Installed v$_version',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 13, color: c.textSecondary),
+                  ),
+                ],
               ),
             ),
-            child: Text(_checking ? 'Checking…' : 'Check for updates'),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: btnW,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: _checking
+                      ? null
+                      : () {
+                          PremiumHaptics.select();
+                          _manualCheck();
+                        },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                      _checking ? 'Checking…' : 'Check for updates'),
+                ),
+              ),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+}
+
+/// Profile > Help: copy-paste diagnostics for testers, plus clearing the
+/// local error log. Everything stays on-device; nothing is uploaded.
+class _HelpCard extends StatefulWidget {
+  const _HelpCard();
+
+  @override
+  State<_HelpCard> createState() => _HelpCardState();
+}
+
+class _HelpCardState extends State<_HelpCard> {
+  bool _busy = false;
+
+  Future<void> _copyDiagnostics() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (!mounted) return;
+      final text = await buildDiagnosticsText(
+        app: context.read<AppState>(),
+        routine: context.read<RoutineState>(),
+        notes: context.read<NotesState>(),
+        context: context,
+      );
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Diagnostics copied.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Couldn't build diagnostics.")),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _clearLogs() async {
+    await ErrorLog.clear();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Error log cleared.')),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Help',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: c.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Something broken? Copy diagnostics and send them to support.',
+            style: TextStyle(fontSize: 13, color: c.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _busy ? null : _copyDiagnostics,
+                  child: Text(_busy ? 'Copying…' : 'Copy diagnostics'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextButton(
+                  onPressed: _clearLogs,
+                  child: const Text('Clear logs'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -533,15 +741,129 @@ class _UpdateCardState extends State<_UpdateCard> {
   }
 }
 
-/// Profile > Courses navigation row (count + chevron).
-class _CoursesRow extends StatelessWidget {
+/// Profile > Notifications > gallery permission status + request.
+/// Sits beside the notification toggle so photo access is managed in the
+/// same place. Refreshes on resume (user may grant in system settings).
+class _GalleryPermissionTile extends StatefulWidget {
+  const _GalleryPermissionTile();
+
   @override
+  State<_GalleryPermissionTile> createState() => _GalleryPermissionTileState();
+}
+
+class _GalleryPermissionTileState extends State<_GalleryPermissionTile>
+    with WidgetsBindingObserver {
+  String _status = 'unknown';
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final s = await DeviceChannel.getStoragePermissionStatus();
+      if (mounted) setState(() => _status = s);
+    } catch (_) {}
+  }
+
+  Future<void> _onAction() async {
+    if (_busy) return;
+    if (_status == 'permanentlyDenied') {
+      await DeviceChannel.openAppSettings();
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final s = await DeviceChannel.requestStoragePermission();
+      if (!mounted) return;
+      setState(() => _status = s);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(s == 'granted'
+              ? 'Gallery access allowed.'
+              : s == 'permanentlyDenied'
+                  ? 'Gallery blocked — enable it in app settings.'
+                  : "Couldn't get gallery access."),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final granted = _status == 'granted';
+    final blocked = _status == 'permanentlyDenied';
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Gallery permission',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: c.textPrimary,
+                ),
+              ),
+              Text(
+                granted
+                    ? 'Allowed'
+                    : blocked
+                        ? 'Blocked — enable in settings'
+                        : _status == 'denied'
+                            ? 'Not allowed'
+                            : 'Checking…',
+                style: TextStyle(fontSize: 12, color: c.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        if (!granted)
+          TextButton(
+            onPressed: _busy ? null : _onAction,
+            child: Text(blocked
+                ? 'Open settings'
+                : _busy
+                    ? 'Asking…'
+                    : 'Allow'),
+          )
+        else
+          Icon(Icons.check_circle_outline,
+              size: 20, color: c.textSecondary),
+      ],
+    );
+  }
+}
+
+/// Profile > Courses navigation row (count + chevron).
+class _CoursesRow extends StatelessWidget {  @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
     final count = context.select((RoutineState r) => r.courses.length);
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
+        PremiumHaptics.tap();
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CoursesScreen()),
         );

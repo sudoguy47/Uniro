@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../models/class_slot.dart';
 import '../models/course.dart';
@@ -202,52 +202,71 @@ class _RoutineScreenState extends State<RoutineScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header.
+            // Header. Title shrinks by ellipsis; the button keeps a
+            // measured slot and shrink-fits so the Row never overflows
+            // at 320dp / large text.
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Routine',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: c.textPrimary,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _openForm();
-                    },
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: c.accent,
-                        borderRadius: BorderRadius.circular(999),
+              child: LayoutBuilder(builder: (context, cons) {
+                final btnW =
+                    (cons.maxWidth * 0.42).clamp(96.0, 170.0);
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Routine',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: c.textPrimary,
+                        ),
                       ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.add,
-                              size: 16, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text(
-                            'Add class',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: btnW,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: () {
+                            PremiumHaptics.tap();
+                            _openForm();
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: c.accent,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add,
+                                    size: 16, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Add class',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                );
+              }),
             ),
             // Day selector.
             SizedBox(
@@ -269,7 +288,7 @@ class _RoutineScreenState extends State<RoutineScreen>
                     isToday: isTodayChip,
                     onTap: () {
                       if (_weekday == w) return;
-                      HapticFeedback.selectionClick();
+                      PremiumHaptics.select();
                       setState(() {
                         _weekday = w;
                         _leavingId = null;
@@ -373,29 +392,36 @@ class _DayChip extends StatelessWidget {
             width: isToday && !selected ? 2 : 1,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _names[weekday],
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: selected
-                    ? c.navActiveText
-                    : (isToday ? c.accent : c.textSecondary),
+        alignment: Alignment.center,
+        // Shrink-fit: identical at normal sizes, scales down instead of
+        // throwing at extreme text scales.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _names[weekday],
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selected
+                      ? c.navActiveText
+                      : (isToday ? c.accent : c.textSecondary),
+                ),
               ),
-            ),
-            Text(
-              '$date',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color:
-                    selected ? c.navActiveText : c.textPrimary,
+              Text(
+                '$date',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color:
+                      selected ? c.navActiveText : c.textPrimary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -614,7 +640,7 @@ class _RoutineCardState extends State<_RoutineCard>
     return GestureDetector(
       onTap: () {
         if (widget.leaving) return;
-        HapticFeedback.lightImpact();
+        PremiumHaptics.tap();
         widget.onTap();
       },
       behavior: HitTestBehavior.opaque,
@@ -679,7 +705,7 @@ class _EmptyDay extends StatelessWidget {
           const SizedBox(height: 12),
           GestureDetector(
             onTap: () {
-              HapticFeedback.lightImpact();
+              PremiumHaptics.tap();
               onAdd();
             },
             child: Container(

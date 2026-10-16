@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../domain/haptics.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/task.dart';
@@ -88,7 +88,7 @@ class TodayTaskCard extends StatelessWidget {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          HapticFeedback.lightImpact();
+                          PremiumHaptics.tap();
                           context.read<AppState>().completeTask(task.id);
                         },
                         child: AnimatedContainer(

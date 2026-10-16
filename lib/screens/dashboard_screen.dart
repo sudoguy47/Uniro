@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../state/app_state.dart';
 import '../theme/app_colors.dart';
@@ -66,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   void _openNewTask() {
-    HapticFeedback.lightImpact();
+    PremiumHaptics.tap();
     context.read<AppState>().setNewTaskOpen(true);
     _showNewTaskNotifier.value = true;
   }
@@ -80,7 +80,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         _plusKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !mounted) return;
     final pos = box.localToGlobal(Offset.zero);
-    HapticFeedback.selectionClick();
+    PremiumHaptics.select();
     setState(() => _plusOpen = true);
     _plusOverlay = OverlayEntry(
       builder: (_) => Stack(
@@ -239,15 +239,28 @@ class _CreatePopover extends StatefulWidget {
 class _CreatePopoverState extends State<_CreatePopover>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    final reduce = MediaQuery.disableAnimationsOf(context);
     _ctrl = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: reduce ? 120 : 180),
-    )..forward();
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final reduce = MediaQuery.disableAnimationsOf(context);
+      if (reduce) {
+        _ctrl.duration = const Duration(milliseconds: 120);
+      }
+      _ctrl.forward();
+    }
   }
 
   @override
@@ -319,7 +332,7 @@ class _CreatePopoverState extends State<_CreatePopover>
     Widget row = InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () {
-        HapticFeedback.selectionClick();
+        PremiumHaptics.select();
         onTap();
       },
       child: Padding(
@@ -329,12 +342,16 @@ class _CreatePopoverState extends State<_CreatePopover>
           children: [
             Icon(icon, size: 20, color: c.accent),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: c.textPrimary,
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: c.textPrimary,
+                ),
               ),
             ),
           ],
@@ -375,7 +392,7 @@ class _ViewToggle extends StatelessWidget {
         child: GestureDetector(
           onTap: () {
             if ((value == 'completed') == completed) return;
-            HapticFeedback.selectionClick();
+            PremiumHaptics.select();
             onChanged(value);
           },
           child: AnimatedContainer(
@@ -475,7 +492,7 @@ class _DashboardHeaderState extends State<_DashboardHeader> {
   }
 
   void _manualToggle() {
-    HapticFeedback.selectionClick();
+    PremiumHaptics.select();
     setState(() => _showQuote = !_showQuote);
     _restartCycle();
   }
@@ -531,10 +548,12 @@ class _DashboardHeaderState extends State<_DashboardHeader> {
                       _manualToggle();
                     },
                     behavior: HitTestBehavior.opaque,
-                    // Fixed height: greeting ⇄ quote swaps never push the
-                    // content below up/down.
-                    child: SizedBox(
-                      height: 66,
+                    // minHeight, not fixed height: identical 66dp at normal
+                    // sizes, but grows instead of overflowing when large
+                    // text wraps (the dashboard scrolls, so growth is safe).
+                    child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(minHeight: 66),
                       child: AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
                         switchInCurve: Curves.easeOut,
@@ -566,7 +585,7 @@ class _DashboardHeaderState extends State<_DashboardHeader> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '\u201C$quote\u201D',
+                                    stripQuoteMarks(quote),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -620,7 +639,7 @@ class _DashboardHeaderState extends State<_DashboardHeader> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    HapticFeedback.lightImpact();
+                    PremiumHaptics.tap();
                     widget.onNavigateToProfile?.call();
                   },
                   behavior: HitTestBehavior.opaque,
@@ -708,19 +727,31 @@ class _WeeklyLoadSection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Weekly load',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary,
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'Weekly load',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: c.textPrimary,
+                    ),
                   ),
                 ),
-                Text(
-                  '$pendingCount due this week',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: c.textSecondary,
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '$pendingCount due this week',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: c.textSecondary,
+                    ),
                   ),
                 ),
               ],

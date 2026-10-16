@@ -376,36 +376,42 @@ class _FocusScreenState extends State<FocusScreen>
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: c.border),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Text(
-                'Focus complete! Take a ${st.breakMin}-min break?',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: c.textPrimary),
-              ),
+            Text(
+              'Focus complete! Take a ${st.breakMin}-min break?',
+              style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: c.textPrimary),
             ),
-            TextButton(
-              onPressed: () {
-                PremiumHaptics.select();
-                st.dismissBreakOffer();
-              },
-              child: Text('Skip',
-                  style: TextStyle(color: c.textSecondary)),
-            ),
-            const SizedBox(width: 4),
-            FilledButton(
-              onPressed: () {
-                PremiumHaptics.tap();
-                st.startBreak();
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Start break'),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 4,
+              runSpacing: 8,
+              alignment: WrapAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    PremiumHaptics.select();
+                    st.dismissBreakOffer();
+                  },
+                  child: Text('Skip',
+                      style: TextStyle(color: c.textSecondary)),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    PremiumHaptics.tap();
+                    st.startBreak();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: c.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Start break'),
+                ),
+              ],
             ),
           ],
         ),
@@ -469,39 +475,47 @@ class _FocusScreenState extends State<FocusScreen>
         : st.paused
             ? 'Resume'
             : 'Pause';
+    final centerIcon = !st.running
+        ? Icons.play_arrow_rounded
+        : st.paused
+            ? Icons.play_arrow_rounded
+            : Icons.pause_rounded;
+
+    VoidCallback? restartTap;
+    if (idle && !st.pendingBreak) {
+      restartTap = null;
+    } else if (idle) {
+      restartTap = () {
+        PremiumHaptics.tap();
+        st.restart();
+      };
+    } else {
+      restartTap = _onRestart;
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: idle && !st.pendingBreak
-                  ? null
-                  : () {
-                      if (idle) {
-                        PremiumHaptics.tap();
-                        st.restart();
-                      } else {
-                        _onRestart();
-                      }
-                    },
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Restart'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: c.textPrimary,
-                side: BorderSide(color: c.border),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
+            child: _FocusBtn(
+              icon: Icons.refresh_rounded,
+              label: 'Restart',
+              outlinedColor: c.textPrimary,
+              borderColor: c.border,
+              onTap: restartTap,
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
             flex: 2,
-            child: FilledButton.icon(
-              onPressed: () {
+            child: _FocusBtn(
+              icon: centerIcon,
+              iconSize: 20,
+              label: centerLabel,
+              fill: c.accent,
+              outlinedColor: Colors.white,
+              onTap: () {
                 if (!st.running) {
                   _onStart();
                 } else if (st.paused) {
@@ -512,38 +526,16 @@ class _FocusScreenState extends State<FocusScreen>
                   st.pause();
                 }
               },
-              icon: Icon(
-                  !st.running
-                      ? Icons.play_arrow_rounded
-                      : st.paused
-                          ? Icons.play_arrow_rounded
-                          : Icons.pause_rounded,
-                  size: 20),
-              label: Text(centerLabel),
-              style: FilledButton.styleFrom(
-                backgroundColor: c.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                textStyle: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w800),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
             ),
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: OutlinedButton.icon(
-              onPressed: !canEnd ? null : _onEnd,
-              icon: const Icon(Icons.stop_rounded, size: 18),
-              label: const Text('End'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: c.overdue,
-                side: BorderSide(color: c.overdue.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
+            child: _FocusBtn(
+              icon: Icons.stop_rounded,
+              label: 'End',
+              outlinedColor: c.overdue,
+              borderColor: c.overdue.withValues(alpha: 0.5),
+              onTap: !canEnd ? null : _onEnd,
             ),
           ),
         ],
@@ -560,7 +552,95 @@ class _FocusScreenState extends State<FocusScreen>
         st.linkKind == 'none' ? 'free focus' : _linkLabel(st.linkKind, st.linkId);
     return Text(
       'Today in $label: ${formatDuration(total)}',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 13, color: c.textSecondary),
+    );
+  }
+}
+
+/// Focus control button with fixed height and a scale-down label row:
+/// at 320dp / large text the content shrinks instead of overflowing.
+class _FocusBtn extends StatelessWidget {
+  const _FocusBtn({
+    required this.icon,
+    required this.label,
+    required this.outlinedColor,
+    this.iconSize = 18,
+    this.fill,
+    this.borderColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color outlinedColor;
+  final double iconSize;
+  final Color? fill;
+  final Color? borderColor;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    Widget content = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: iconSize, color: outlinedColor),
+          const SizedBox(width: 6),
+          Text(label,
+              maxLines: 1,
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: outlinedColor)),
+        ],
+      ),
+    );
+    content = SizedBox(height: 52, child: Center(child: content));
+    if (fill != null) {
+      return Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: Container(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap == null
+                  ? null
+                  : () {
+                      onTap!();
+                    },
+              child: content,
+            ),
+          ),
+        ),
+      );
+    }
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: borderColor ?? outlinedColor, width: 1),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: content,
+          ),
+        ),
+      ),
     );
   }
 }

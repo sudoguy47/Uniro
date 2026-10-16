@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../../state/notes_state.dart';
 
@@ -42,7 +42,7 @@ class FolderChipsRow extends StatelessWidget {
   }
 
   void _showFolderOptionsSheet(BuildContext context, String folderName) {
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
     showModalBottomSheet<void>(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -201,7 +201,7 @@ class FolderChipsRow extends StatelessWidget {
           return InkWell(
             borderRadius: BorderRadius.circular(999),
             onTap: () {
-              HapticFeedback.selectionClick();
+              PremiumHaptics.select();
               context.read<NotesState>().setActiveFolder(name);
             },
             onLongPress: isCustomFolder

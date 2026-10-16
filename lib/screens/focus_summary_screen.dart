@@ -152,12 +152,12 @@ class _FocusSummaryScreenState extends State<FocusSummaryScreen> {
       );
     }
 
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: [
         chip('Today', _Range.today),
-        const SizedBox(width: 8),
         chip('This week', _Range.week),
-        const SizedBox(width: 8),
         chip('All time', _Range.all),
       ],
     );

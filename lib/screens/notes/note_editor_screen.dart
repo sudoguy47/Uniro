@@ -109,30 +109,62 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     _saveNow();
     final newBlock = NoteBlock(id: generateNoteId(), type: type);
     final newBlocks = List<NoteBlock>.of(_note.blocks)..insert(afterIndex + 1, newBlock);
+    
+    final newCtrl = TextEditingController(text: '');
+    final newFocus = FocusNode();
+    final insertIdx = afterIndex + 1;
+    newFocus.addListener(() {
+      if (newFocus.hasFocus && mounted) {
+        setState(() => _focusedBlockIndex = insertIdx);
+      }
+    });
+
+    if (insertIdx <= _blockControllers.length) {
+      _blockControllers.insert(insertIdx, newCtrl);
+      _blockFocuses.insert(insertIdx, newFocus);
+    } else {
+      _blockControllers.add(newCtrl);
+      _blockFocuses.add(newFocus);
+    }
+
     setState(() {
       _note = _note.copyWith(blocks: newBlocks);
-      _rebuildControllers();
+      _focusedBlockIndex = insertIdx;
     });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (afterIndex + 1 < _blockFocuses.length) {
-        _blockFocuses[afterIndex + 1].requestFocus();
+      if (insertIdx < _blockFocuses.length && mounted) {
+        _blockFocuses[insertIdx].requestFocus();
       }
     });
   }
 
   void _removeBlockAt(int index) {
-    if (_note.blocks.length <= 1) return;
+    if (_note.blocks.length <= 1) {
+      if (index < _blockControllers.length) {
+        _blockControllers[index].clear();
+      }
+      return;
+    }
     _saveNow();
+    final targetIndex = (index - 1).clamp(0, _note.blocks.length - 2);
+
+    if (targetIndex < _blockFocuses.length) {
+      _blockFocuses[targetIndex].requestFocus();
+    }
+
+    final oldCtrl = index < _blockControllers.length ? _blockControllers.removeAt(index) : null;
+    final oldFocus = index < _blockFocuses.length ? _blockFocuses.removeAt(index) : null;
+
     final newBlocks = List<NoteBlock>.of(_note.blocks)..removeAt(index);
     setState(() {
       _note = _note.copyWith(blocks: newBlocks);
-      _rebuildControllers();
+      _focusedBlockIndex = targetIndex;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final prev = (index - 1).clamp(0, _blockFocuses.length - 1);
-      if (prev < _blockFocuses.length) {
-        _blockFocuses[prev].requestFocus();
-      }
+
+    Future.microtask(() {
+      oldCtrl?.dispose();
+      oldFocus?.dispose();
     });
   }
 
@@ -597,9 +629,6 @@ class _BlockWidget extends StatelessWidget {
           inputFormatters: [
             _BlockKeyHandler(
               onEnter: onEnter,
-              onBackspaceEmpty: () {
-                if (controller.text.isEmpty) onBackspaceEmpty();
-              },
             ),
           ],
         ),
@@ -708,10 +737,9 @@ class _BlockWidget extends StatelessWidget {
 class _BlockKeyHandler extends TextInputFormatter {
   const _BlockKeyHandler({
     required this.onEnter,
-    required this.onBackspaceEmpty,
   });
 
-  final VoidCallback onEnter, onBackspaceEmpty;
+  final VoidCallback onEnter;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -721,9 +749,6 @@ class _BlockKeyHandler extends TextInputFormatter {
     if (next.text.endsWith('\n') && !old.text.endsWith('\n')) {
       Future.microtask(onEnter);
       return old;
-    }
-    if (next.text.isEmpty && old.text.isEmpty) {
-      Future.microtask(onBackspaceEmpty);
     }
     return next;
   }

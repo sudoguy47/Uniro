@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../models/course.dart';
 import '../services/notification_service.dart';
@@ -103,7 +103,7 @@ class CoursesScreen extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.add_rounded, color: c.accent),
             onPressed: () {
-              HapticFeedback.lightImpact();
+              PremiumHaptics.tap();
               _openEditor(context);
             },
           ),
@@ -179,7 +179,7 @@ class CoursesScreen extends StatelessWidget {
                           icon: Icon(Icons.edit_outlined,
                               size: 20, color: c.textSecondary),
                           onPressed: () {
-                            HapticFeedback.selectionClick();
+                            PremiumHaptics.select();
                             _openEditor(context, existing: course);
                           },
                         ),
@@ -187,7 +187,7 @@ class CoursesScreen extends StatelessWidget {
                           icon: Icon(Icons.delete_outline,
                               size: 20, color: c.overdue),
                           onPressed: () {
-                            HapticFeedback.lightImpact();
+                            PremiumHaptics.tap();
                             _confirmDelete(context, course);
                           },
                         ),
@@ -250,7 +250,7 @@ class _CourseEditorState extends State<_CourseEditor> {
         colorTag: _color,
       ));
     }
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
     Navigator.pop(context);
   }
 

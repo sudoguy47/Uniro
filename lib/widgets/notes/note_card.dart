@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../domain/haptics.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/note.dart';
@@ -77,7 +77,7 @@ class _NoteCardState extends State<NoteCard>
   }
 
   void _showContextMenu() {
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
     final cs = Theme.of(context).colorScheme;
     final note = widget.note;
 

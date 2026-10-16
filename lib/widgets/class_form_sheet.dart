@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../models/class_slot.dart';
 import '../models/course.dart';
@@ -7,6 +7,7 @@ import '../services/notification_service.dart';
 import '../state/app_state.dart';
 import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
+import 'battery_guide.dart';
 import '../screens/routine_screen.dart' show courseWeekdayNames;
 
 /// Opens the add/edit class bottom sheet.
@@ -17,7 +18,7 @@ Future<void> showClassFormSheet(
   ClassSlot? existing,
   int? initialWeekday,
 }) {
-  HapticFeedback.lightImpact();
+  PremiumHaptics.tap();
   final c = Theme.of(context).extension<AppColors>()!;
   return showModalBottomSheet<void>(
     context: context,
@@ -89,7 +90,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   int _mins(TimeOfDay t) => t.hour * 60 + t.minute;
 
   void _error(String msg) {
-    HapticFeedback.lightImpact();
+    PremiumHaptics.tap();
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(msg)));
@@ -245,7 +246,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       slots: routine.slots,
       enabled: enabled,
     );
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
+    if (!mounted) return;
+    if (_reminder != null) {
+      BatteryHint.noteReminderCreated();
+    }
     if (mounted) Navigator.pop(context);
   }
 
@@ -302,7 +307,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PremiumHaptics.select();
                       setState(() {
                         if (_isEdit) {
                           _days = {day};
@@ -413,7 +418,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                           ))
                       .toList(),
                   onChanged: (v) {
-                    HapticFeedback.selectionClick();
+                    PremiumHaptics.select();
                     setState(() => _reminder = v);
                   },
                 ),
@@ -451,7 +456,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       children: [
         GestureDetector(
           onTap: () {
-            HapticFeedback.selectionClick();
+            PremiumHaptics.select();
             setState(() => _showNewCourse = !_showNewCourse);
           },
           child: Container(

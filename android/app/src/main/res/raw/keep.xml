@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- flutter_local_notifications README (v18 "Release build configuration"):
+     keep the notification icon so shrinkResources never discards it.
+     The app uses @mipmap/ic_launcher as its notification icon. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@mipmap/ic_launcher" />

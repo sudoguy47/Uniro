@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../../domain/haptics.dart';
 import '../../models/note.dart';
 
 class FormattingSheet extends StatefulWidget {
@@ -123,7 +123,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                 isSelected: _style.bold,
                 isBold: true,
                 onTap: () {
-                  HapticFeedback.lightImpact();
+                  PremiumHaptics.tap();
                   _updateStyle(_style.copyWith(bold: !_style.bold));
                 },
               ),
@@ -135,7 +135,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                 isSelected: _style.italic,
                 isItalic: true,
                 onTap: () {
-                  HapticFeedback.lightImpact();
+                  PremiumHaptics.tap();
                   _updateStyle(_style.copyWith(italic: !_style.italic));
                 },
               ),
@@ -182,7 +182,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                       constraints: const BoxConstraints(),
                       onPressed: () {
                         if (_style.fontSize > 14.0) {
-                          HapticFeedback.lightImpact();
+                          PremiumHaptics.tap();
                           _updateStyle(_style.copyWith(fontSize: (_style.fontSize - 1).clamp(14.0, 24.0)));
                         }
                       },
@@ -204,7 +204,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                       constraints: const BoxConstraints(),
                       onPressed: () {
                         if (_style.fontSize < 24.0) {
-                          HapticFeedback.lightImpact();
+                          PremiumHaptics.tap();
                           _updateStyle(_style.copyWith(fontSize: (_style.fontSize + 1).clamp(14.0, 24.0)));
                         }
                       },
@@ -234,7 +234,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                 final isSelected = _style.textColor == hex;
                 return GestureDetector(
                   onTap: () {
-                    HapticFeedback.lightImpact();
+                    PremiumHaptics.tap();
                     _updateStyle(_style.copyWith(textColor: hex));
                   },
                   child: Container(
@@ -283,7 +283,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
                 final isSelected = _style.highlightColor == hex;
                 return GestureDetector(
                   onTap: () {
-                    HapticFeedback.lightImpact();
+                    PremiumHaptics.tap();
                     _updateStyle(_style.copyWith(highlightColor: hex));
                   },
                   child: Container(
@@ -387,7 +387,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
     final isSelected = _style.alignment == align;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
+        PremiumHaptics.tap();
         _updateStyle(_style.copyWith(alignment: align));
       },
       child: Container(
@@ -421,7 +421,7 @@ class _FormattingSheetState extends State<FormattingSheet> {
       icon: Icon(icon, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
       onPressed: () {
-        HapticFeedback.lightImpact();
+        PremiumHaptics.tap();
         widget.onAddBlock(type);
       },
     );

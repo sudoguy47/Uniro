@@ -6,6 +6,7 @@ import '../domain/quotes.dart';
 import '../models/class_slot.dart';
 import '../models/course.dart';
 import '../models/task.dart';
+import 'device_channel.dart';
 import 'local_store.dart';
 
 class NotificationService {
@@ -25,21 +26,7 @@ class NotificationService {
   Future<void> init() async {
     if (kIsWeb || _initialized) return;
 
-    try {
-      tz.initializeTimeZones();
-      // Set to local location if available
-      final now = DateTime.now();
-      final offset = now.timeZoneOffset;
-      // Find or set timezone based on local offset
-      for (final loc in tz.timeZoneDatabase.locations.values) {
-        if (loc.currentTimeZone.offset == offset.inMilliseconds) {
-          tz.setLocalLocation(loc);
-          break;
-        }
-      }
-    } catch (e) {
-      debugPrint('Timezone init notice: $e');
-    }
+    await resolveLocalTimezone();
 
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -83,6 +70,78 @@ class NotificationService {
     }
 
     _initialized = true;
+  }
+
+  /// Resolves tz.local from the OS zone id via the device channel.
+  /// Order: exact IANA id -> legacy offset match -> UTC. Never throws.
+  /// The winning id is saved to LocalStore ('tz_id') so
+  /// [checkAndRescheduleIfNeeded] can detect zone changes.
+  Future<void> resolveLocalTimezone() async {
+    try {
+      tz.initializeTimeZones();
+    } catch (e) {
+      debugPrint('Timezone db notice: $e');
+      return;
+    }
+    // 1. Exact id from Kotlin (TimeZone.getDefault().id).
+    try {
+      final id = await DeviceChannel.getTimeZoneId();
+      if (id != null && id.isNotEmpty) {
+        try {
+          String normalizedId = id;
+          if (id.startsWith('GMT+') || id.startsWith('GMT-') || id.startsWith('UTC+') || id.startsWith('UTC-')) {
+            final match = RegExp(r'(?:GMT|UTC)([+-])(\d{1,2}):?(\d{2})?').firstMatch(id);
+            if (match != null) {
+              final sign = match.group(1);
+              final hours = int.tryParse(match.group(2) ?? '0') ?? 0;
+              final etcSign = sign == '+' ? '-' : '+';
+              normalizedId = 'Etc/GMT$etcSign$hours';
+            }
+          }
+          tz.setLocalLocation(tz.getLocation(normalizedId));
+          LocalStore.instance.save('tz_id', normalizedId);
+          return;
+        } catch (_) {
+          // Unknown to the tz database: fall through to offset match.
+          debugPrint('Timezone id "$id" unknown, trying offset match');
+        }
+      }
+    } catch (e) {
+      debugPrint('Timezone id notice: $e');
+    }
+    // 2. Legacy offset match (prioritize active population regions)
+    try {
+      final now = DateTime.now();
+      final offset = now.timeZoneOffset;
+      tz.Location? bestMatch;
+      for (final loc in tz.timeZoneDatabase.locations.values) {
+        if (loc.currentTimeZone.offset == offset.inMilliseconds) {
+          bestMatch ??= loc;
+          if (loc.name.startsWith('Asia/') ||
+              loc.name.startsWith('America/') ||
+              loc.name.startsWith('Europe/') ||
+              loc.name.startsWith('Africa/') ||
+              loc.name.startsWith('Australia/')) {
+            bestMatch = loc;
+            break;
+          }
+        }
+      }
+      if (bestMatch != null) {
+        tz.setLocalLocation(bestMatch);
+        LocalStore.instance.save('tz_id', bestMatch.name);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Timezone offset notice: $e');
+    }
+    // 3. Last resort: UTC keeps absoluteTime scheduling working.
+    try {
+      tz.setLocalLocation(tz.getLocation('UTC'));
+      LocalStore.instance.save('tz_id', 'UTC');
+    } catch (e) {
+      debugPrint('Timezone UTC notice: $e');
+    }
   }
 
   /// Requests notification and exact alarm permissions (Android 13+ & iOS).
@@ -279,6 +338,11 @@ class NotificationService {
 
   /// Re-arms everything after a permission grant or settings change:
   /// task reminders, the daily greeting, and class reminders.
+  /// NOTE: this runs in Dart on launch / resume. Reboot coverage comes
+  /// from the plugin's ScheduledNotificationBootReceiver declared in
+  /// AndroidManifest.xml (the OS re-fires persisted notifications after
+  /// BOOT_COMPLETED / MY_PACKAGE_REPLACED); this method then rebuilds the
+  /// full schedule on the next app start.
   Future<void> rearmAll({
     required List<Task> tasks,
     required List<Course> courses,
@@ -293,6 +357,50 @@ class NotificationService {
         name: name, enabled: enabled, tasks: tasks, slots: slots);
     await refreshClassReminders(
         courses: courses, slots: slots, enabled: enabled);
+  }
+
+  /// Rebuilds tz.local and reschedules everything when the native
+  /// time-change flag is set (TimeChangeReceiver saw TIMEZONE_CHANGED /
+  /// TIME_SET / DATE_CHANGED) or when the system zone id differs from the
+  /// last known one. Called on app launch and on AppLifecycleState.resumed.
+  /// Returns true when a refresh + reschedule ran. Never throws.
+  Future<bool> checkAndRescheduleIfNeeded({
+    required List<Task> tasks,
+    required List<Course> courses,
+    required List<ClassSlot> slots,
+    required String name,
+    required bool enabled,
+  }) async {
+    if (kIsWeb) return false;
+    try {
+      final flag = await DeviceChannel.getNeedsReschedule();
+      final currentId = await DeviceChannel.getTimeZoneId();
+      final stored = LocalStore.instance.load('tz_id') as String?;
+      final tzChanged =
+          currentId != null && stored != null && currentId != stored;
+      if (!flag && !tzChanged) {
+        if (currentId != null && stored == null) {
+          LocalStore.instance.save('tz_id', currentId);
+        }
+        return false;
+      }
+      // Force tz.local to rebuild, then rebuild the whole schedule.
+      _initialized = false;
+      await init();
+      await rearmAll(
+        tasks: tasks,
+        courses: courses,
+        slots: slots,
+        name: name,
+        enabled: enabled,
+      );
+      await DeviceChannel.clearNeedsReschedule();
+      if (currentId != null) LocalStore.instance.save('tz_id', currentId);
+      return true;
+    } catch (e) {
+      debugPrint('checkAndReschedule notice: $e');
+      return false;
+    }
   }
 
   /// Re-syncs all notifications for active pending tasks.
@@ -311,14 +419,21 @@ class NotificationService {
   /// Cancels all notifications.
   Future<void> cancelAll() async {
     if (kIsWeb || !_initialized) return;
-    await _notifications.cancelAll();
+    try {
+      await _notifications.cancelAll();
+    } catch (e) {
+      debugPrint('cancelAll notice: $e');
+    }
   }
 
-  /// Daily 6:00 AM greeting: exactly ONE quote for the day plus a
-  /// reminder of today's classes and due tasks. Uses a stable id so every
-  /// re-schedule overwrites the previous one instead of stacking. Repeats
-  /// daily via [DateTimeComponents.time]; re-armed on every app start
-  /// (covers reboots) and whenever the name / toggle changes.
+  /// Daily 6:00 AM greeting: schedules distinct daily notifications for the
+  /// next 7 days (IDs 900001 to 900007). Each day gets its own quote, class
+  /// count, and task count for that specific date.
+  /// Scheduling 7 days ahead guarantees delivery every morning even if the
+  /// app is closed or the device enters Doze Mode overnight.
+  static const int _greetingIdStart = 900001;
+  static const int _greetingDaysCount = 7;
+
   Future<void> scheduleDailyGreeting({
     required String name,
     required bool enabled,
@@ -327,26 +442,16 @@ class NotificationService {
   }) async {
     if (kIsWeb) return;
     if (!_initialized) await init();
-    const id = 900001;
     try {
-      if (!enabled) {
-        await _notifications.cancel(id);
-        return;
+      // Cancel existing potential daily greeting notification IDs (900001 - 900014)
+      for (var i = 0; i < 14; i++) {
+        try {
+          await _notifications.cancel(_greetingIdStart + i);
+        } catch (_) {}
       }
+      if (!enabled) return;
+
       final now = DateTime.now();
-      var next = DateTime(now.year, now.month, now.day, 6, 0);
-      if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
-
-      final today = _ymd(next);
-      final classCount =
-          slots.where((s) => s.weekday == next.weekday).length;
-      final taskCount = tasks
-          .where((t) =>
-              t.status == TaskStatus.pending && t.dueDate == today)
-          .length;
-      final body =
-          '${quoteOfTheDay(next)}\n${todayAgendaLine(classCount: classCount, taskCount: taskCount)}';
-
       const details = NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
@@ -365,18 +470,40 @@ class NotificationService {
         ),
       );
 
-      await _notifications.zonedSchedule(
-        id,
-        'Rise and shine, $name! \u2600\uFE0F',
-        body,
-        tz.TZDateTime.from(next, tz.local),
-        details,
-        androidScheduleMode: await _scheduleMode(),
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-        matchDateTimeComponents: DateTimeComponents.time,
-        payload: 'daily_greeting',
-      );
+      final scheduleMode = await _scheduleMode();
+
+      for (var dayOffset = 0; dayOffset < _greetingDaysCount; dayOffset++) {
+        final date = DateTime(now.year, now.month, now.day)
+            .add(Duration(days: dayOffset));
+        final targetDateTime =
+            DateTime(date.year, date.month, date.day, 6, 0);
+
+        // Skip if 6:00 AM for today has already passed
+        if (!targetDateTime.isAfter(now)) continue;
+
+        final todayStr = _ymd(targetDateTime);
+        final classCount =
+            slots.where((s) => s.weekday == targetDateTime.weekday).length;
+        final taskCount = tasks
+            .where((t) =>
+                t.status == TaskStatus.pending && t.dueDate == todayStr)
+            .length;
+        final body =
+            '${quoteOfTheDay(targetDateTime)}\n${todayAgendaLine(classCount: classCount, taskCount: taskCount)}';
+
+        final id = _greetingIdStart + dayOffset;
+        await _notifications.zonedSchedule(
+          id,
+          'Rise and shine, $name! \u2600\uFE0F',
+          body,
+          tz.TZDateTime.from(targetDateTime, tz.local),
+          details,
+          androidScheduleMode: scheduleMode,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          payload: 'daily_greeting',
+        );
+      }
     } catch (e) {
       debugPrint('scheduleDailyGreeting notice: $e');
     }
@@ -391,9 +518,21 @@ class NotificationService {
   static const int _classWindowDays = 14;
 
   Map<String, int> _classNotifMap() {
-    final raw = LocalStore.instance.load('class_notif_map');
-    if (raw is! Map) return {};
-    return raw.map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+    try {
+      final raw = LocalStore.instance.load('class_notif_map');
+      if (raw is! Map) return {};
+      final out = <String, int>{};
+      raw.forEach((k, v) {
+        try {
+          if (v is num) out[k.toString()] = v.toInt();
+        } catch (_) {
+          LocalStore.instance.markRecovery();
+        }
+      });
+      return out;
+    } catch (_) {
+      return {};
+    }
   }
 
   int _nextClassNotifId() {
@@ -434,8 +573,9 @@ class NotificationService {
 
   /// Full rebuild: cancels every mapped class reminder, then schedules the
   /// next 14 occurrences of each slot with a reminder. Call after any class
-  /// or course change and on app launch (covers reboot + timezone change,
-  /// since the window is recomputed from "now").
+  /// or course change and on app launch (the window is recomputed from
+  /// "now", which is what makes timezone changes take effect once
+  /// [checkAndRescheduleIfNeeded] has rebuilt tz.local).
   Future<void> refreshClassReminders({
     required List<Course> courses,
     required List<ClassSlot> slots,
@@ -520,30 +660,77 @@ class NotificationService {
     String? payload,
   }) async {
     if (kIsWeb) return;
-    if (!_initialized) await init();
-    const details = NotificationDetails(
-      android: AndroidNotificationDetails(
-        channelId,
-        channelName,
-        channelDescription: channelDescription,
-        importance: Importance.max,
-        priority: Priority.high,
-        playSound: true,
-        enableVibration: true,
-        icon: '@mipmap/ic_launcher',
-      ),
-      iOS: DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      ),
-    );
-    await _notifications.show(
-      DateTime.now().millisecond,
-      title,
-      body,
-      details,
-      payload: payload,
-    );
+    try {
+      if (!_initialized) await init();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+      await _notifications.show(
+        DateTime.now().millisecond,
+        title,
+        body,
+        details,
+        payload: payload,
+      );
+    } catch (e) {
+      debugPrint('showInstantNotification notice: $e');
+    }
+  }
+
+  /// Schedules a real notification ~1 minute out so users can verify
+  /// delivery with the screen off. Uses the same exact-or-inexact path as
+  /// real reminders. Returns true when scheduled. Never throws.
+  Future<bool> scheduleTestReminder() async {
+    if (kIsWeb) return false;
+    try {
+      if (!_initialized) await init();
+      const details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+      final fire = DateTime.now().add(const Duration(minutes: 1));
+      await _notifications.zonedSchedule(
+        900002,
+        'Test reminder',
+        'If you see this, reminders work on your phone.',
+        tz.TZDateTime.from(fire, tz.local),
+        details,
+        androidScheduleMode: await _scheduleMode(),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'test_reminder',
+      );
+      return true;
+    } catch (e) {
+      debugPrint('scheduleTestReminder notice: $e');
+      return false;
+    }
   }
 }

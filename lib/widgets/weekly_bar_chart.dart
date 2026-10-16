@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import '../theme/app_colors.dart';
 
 class WeeklyBarChart extends StatefulWidget {
@@ -51,8 +51,11 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
       ),
       child: Column(
         children: [
-          SizedBox(
-            height: 136,
+          // minHeight instead of a fixed height: identical 136dp at normal
+          // sizes, but grows instead of overflowing at large text scales
+          // (the dashboard scrolls, so growth is always safe).
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 136),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
@@ -74,7 +77,7 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
                 return Expanded(
                   child: GestureDetector(
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PremiumHaptics.select();
                       setState(() {
                         _tappedDay = (_tappedDay == dateStr) ? null : dateStr;
                       });
@@ -83,26 +86,37 @@ class _WeeklyBarChartState extends State<WeeklyBarChart> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Floating label chip above bar
-                        AnimatedOpacity(
-                          duration: const Duration(milliseconds: 140),
-                          opacity: isSelected ? 1.0 : 0.0,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 6),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: c.navActiveBg,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              countText,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: c.navActiveText,
+                        // Floating label chip above bar. Wrapped in an
+                        // OverflowBox so a wide count ("12 tasks" on a
+                        // 320dp screen at large text) paints over its
+                        // neighbours instead of throwing a flex overflow.
+                        SizedBox(
+                          height: 22,
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 140),
+                            opacity: isSelected ? 1.0 : 0.0,
+                            child: OverflowBox(
+                              maxWidth: 64,
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                margin:
+                                    const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: c.navActiveBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  countText,
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: c.navActiveText,
+                                  ),
+                                ),
                               ),
-                              maxLines: 1,
                             ),
                           ),
                         ),

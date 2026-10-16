@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/haptics.dart';
+import '../services/notification_service.dart';
 import '../state/app_state.dart';
 import '../state/focus_state.dart';
 import '../state/notes_state.dart';
+import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/routine_screen.dart';
@@ -60,6 +62,31 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (mounted) {
         context.read<NotesState>().flush();
       }
+    }
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Timezone / clock may have changed while away: refresh only when
+      // the native flag or zone id says so. Fire-and-forget, never throws.
+      try {
+        final appState = context.read<AppState>();
+        RoutineState? routine;
+        try {
+          routine = context.read<RoutineState>();
+        } catch (_) {
+          routine = null;
+        }
+        if (routine != null) {
+          NotificationService.instance.checkAndRescheduleIfNeeded(
+            tasks: appState.tasks,
+            courses: routine.courses,
+            slots: routine.slots,
+            name: appState.settings.name,
+            enabled: appState.settings.notificationsEnabled,
+          );
+        }
+        // The user may have toggled system touch feedback or changed
+        // devices settings while away: re-prime the haptic cache.
+        HapticsCapabilities.refresh();
+      } catch (_) {}
     }
   }
 
@@ -179,17 +206,21 @@ class _BottomNavBar extends StatelessWidget {
                     size: 27,
                     color: isActive ? c.accent : inactiveColor,
                   ),
-                  label: Text(
-                    _label(tab),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight:
-                          isActive ? FontWeight.w700 : FontWeight.w500,
-                      color: isActive ? c.accent : inactiveColor,
-                      letterSpacing: -0.1,
+                  label: FittedBox(
+                    // Shrink-to-fit instead of ellipsis: full labels stay
+                    // readable at 320dp / text scale 1.3, never overflow.
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _label(tab),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                        color: isActive ? c.accent : inactiveColor,
+                        letterSpacing: -0.1,
+                      ),
+                      maxLines: 1,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   onTap: () {
                     // Navbar stays whisper-light: selection click only.
