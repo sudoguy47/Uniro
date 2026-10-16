@@ -169,9 +169,14 @@ class _NotesScreenState extends State<NotesScreen>
               ],
             ),
 
-            // Floating pill above bottom nav bar
+            // Floating pill above bottom nav bar. The docked nav is
+            // 68dp + the full bottom system inset tall, so clear it by
+            // that amount plus a 12dp gap on every device (the old
+            // 0.4*inset math overlapped the bar on gesture navigation).
             Positioned(
-              bottom: 74 + MediaQuery.of(context).padding.bottom * 0.4,
+              bottom: 68 +
+                  MediaQuery.of(context).padding.bottom +
+                  12,
               left: 0,
               right: 0,
               child: FloatingNotePill(

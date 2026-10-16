@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths for in-app OTA updates: only the app cache
+     directory, where downloaded APKs are staged before install. -->
+<paths>
+    <cache-path name="updates" path="." />
+</paths>

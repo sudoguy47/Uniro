@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../app/app_shell.dart';
+import '../domain/haptics.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import '../state/app_state.dart';
@@ -40,11 +41,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _requestNotifications() async {
+    PremiumHaptics.tap();
     final granted = await NotificationService.instance.requestPermissions();
     if (mounted) setState(() => _notificationsEnabled = granted);
+    if (granted) PremiumHaptics.confirm();
   }
 
   Future<void> _finishOnboarding() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final app = context.read<AppState>();
     final name = _nameController.text.trim();
 
@@ -72,6 +76,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _next() {
+    // Hide the keyboard first so it never lingers over the next slide,
+    // then give the press its tick.
+    FocusManager.instance.primaryFocus?.unfocus();
+    PremiumHaptics.tap();
     if (_currentPage < 3) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -128,6 +136,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: PageView(
                   controller: _pageController,
                   onPageChanged: (page) {
+                    // Swiped slides must also drop the keyboard (the name
+                    // field keeps focus otherwise and covers the next slide).
+                    FocusManager.instance.primaryFocus?.unfocus();
                     setState(() => _currentPage = page);
                     SystemChrome.setSystemUIOverlayStyle(
                       const SystemUiOverlayStyle(
@@ -148,7 +159,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       title: 'NEVER MISS\nA DEADLINE\nAGAIN.',
                       sub: 'Visual calendar keeps every\ndue date in one place.',
                     ),
-                    _NameSlide(controller: _nameController),
+                    _NameSlide(
+                      controller: _nameController,
+                      onSubmitted: _next,
+                    ),
                     _ReminderSlide(
                       enabled: _notificationsEnabled,
                       onEnable: _requestNotifications,
@@ -177,30 +191,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
 
-              // Bottom bar: Skip | Next + arrow. The action group
-              // shrink-fits so "Let's Start" can never push past 320dp
-              // at large text scales.
+              // Bottom bar: Next / Let's Start + arrow, right-aligned.
+              // The action group shrink-fits so "Let's Start" can never
+              // push past 320dp at large text scales.
               Padding(
                 padding: const EdgeInsets.fromLTRB(28, 10, 28, 26),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    GestureDetector(
-                      onTap: _finishOnboarding,
-                      behavior: HitTestBehavior.opaque,
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'Skip',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
@@ -347,8 +345,9 @@ class _MascotSlide extends StatelessWidget {
 
 /// Slide 3: name input with floating doodles (no mascot circle, per mock).
 class _NameSlide extends StatelessWidget {
-  const _NameSlide({required this.controller});
+  const _NameSlide({required this.controller, required this.onSubmitted});
   final TextEditingController controller;
+  final VoidCallback onSubmitted;
 
   @override
   Widget build(BuildContext context) {
@@ -423,6 +422,8 @@ class _NameSlide extends StatelessWidget {
                 TextField(
                   controller: controller,
                   textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onSubmitted(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 17,

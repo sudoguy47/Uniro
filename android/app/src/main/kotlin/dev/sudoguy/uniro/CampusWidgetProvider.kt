@@ -1,4 +1,4 @@
-package com.example.uniro1
+package dev.sudoguy.uniro
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

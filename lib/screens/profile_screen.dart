@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../widgets/update_dialog.dart';
 import '../models/settings.dart';
 import '../services/diagnostics.dart';
 import '../services/device_channel.dart';
@@ -506,66 +506,11 @@ class _UpdateCardState extends State<_UpdateCard> {
     try {
       final update = await checkForUpdate();
       if (!mounted) return;
-      final c = Theme.of(context).extension<AppColors>()!;
       if (update == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('You are up to date.')));
       } else {
-        await showDialog<void>(
-          context: context,
-          builder: (dialogCtx) => AlertDialog(
-            backgroundColor: c.cardBg,
-            title: const Text('Update available'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Version ${update.version} is ready.',
-                      style:
-                          const TextStyle(fontWeight: FontWeight.w700)),
-                  if (update.notes.trim().isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(update.notes.trim(),
-                        style: TextStyle(
-                            fontSize: 13, color: c.textSecondary)),
-                  ],
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogCtx),
-                child: const Text('Later'),
-              ),
-              TextButton(
-                onPressed: () {
-                  skipUpdateVersion(update.tag);
-                  Navigator.pop(dialogCtx);
-                },
-                child: const Text('Skip this version'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  Navigator.pop(dialogCtx);
-                  try {
-                    await launchUrl(
-                      Uri.parse(update.apkUrl),
-                      mode: LaunchMode.externalApplication,
-                    );
-                  } catch (e) {
-                    debugPrint('open apk link notice: $e');
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: c.accent,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Update'),
-              ),
-            ],
-          ),
-        );
+        await showUpdateDialog(context, update);
       }
     } finally {
       if (mounted) setState(() => _checking = false);

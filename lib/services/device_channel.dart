@@ -152,10 +152,22 @@ class DeviceChannel {
     }
   }
 
+  /// Opens the system "install unknown apps" screen for this app.
+  /// Used when the installer reports the permission is missing.
+  static Future<bool> openInstallPermissionSettings() async {
+    try {
+      final v = await _channel
+          .invokeMethod<bool>('openInstallPermissionSettings');
+      return v ?? false;
+    } catch (e) {
+      debugPrint('device installPermSettings notice: $e');
+      return false;
+    }
+  }
+
   /// Photo/gallery permission state: 'granted', 'denied',
   /// 'permanentlyDenied' or 'unknown'. Never throws.
-  static Future<String> getStoragePermissionStatus() async {
-    try {
+  static Future<String> getStoragePermissionStatus() async {    try {
       final v =
           await _channel.invokeMethod<String>('getStoragePermissionStatus');
       return v ?? 'unknown';
@@ -178,4 +190,65 @@ class DeviceChannel {
       return 'unknown';
     }
   }
+
+  /// App cache directory path for update downloads. Null when unknown.
+  static Future<String?> getCacheDir() async {
+    try {
+      final v = await _channel.invokeMethod<String>('getCacheDir');
+      if (v != null && v.isNotEmpty) return v;
+      return null;
+    } catch (e) {
+      debugPrint('device getCacheDir notice: $e');
+      return null;
+    }
+  }
+
+  /// Verifies a downloaded APK: same package, higher versionCode, same
+  /// signing certificate. Returns null when it cannot be read.
+  static Future<Map<String, dynamic>?> verifyApk(
+    String path, {
+    required String expectedPackage,
+    required int minVersionCode,
+  }) async {
+    try {
+      final v = await _channel.invokeMapMethod<String, dynamic>(
+        'verifyApk',
+        {
+          'path': path,
+          'expectedPackage': expectedPackage,
+          'minVersionCode': minVersionCode,
+        },
+      );
+      return v == null ? null : Map<String, dynamic>.from(v);
+    } catch (e) {
+      debugPrint('device verifyApk notice: $e');
+      return null;
+    }
+  }
+
+  /// Opens Android's installer for [path]. Returns 'launched' or
+  /// 'needPermission' (user must allow installs, then retry).
+  /// Throws [UpdateExceptionBridge] when no installer handles the file.
+  static Future<String> installApk(String path) async {
+    try {
+      final v =
+          await _channel.invokeMethod<String>('installApk', {'path': path});
+      return v ?? 'error';
+    } on PlatformException catch (e) {
+      debugPrint('device installApk notice: $e');
+      throw UpdateExceptionBridge(e.message ?? 'Could not open installer.');
+    } catch (e) {
+      debugPrint('device installApk notice: $e');
+      return 'error';
+    }
+  }
+}
+
+/// Lightweight bridge so device_channel stays dependency-free of
+/// update_service (avoids an import cycle); caught and re-wrapped there.
+class UpdateExceptionBridge implements Exception {
+  UpdateExceptionBridge(this.message);
+  final String message;
+  @override
+  String toString() => 'UpdateExceptionBridge: $message';
 }

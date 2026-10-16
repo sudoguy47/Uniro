@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../domain/haptics.dart';
 import '../services/notification_service.dart';
+import '../services/update_service.dart';
+import '../services/local_store.dart';
+import '../widgets/update_dialog.dart';
 import '../state/app_state.dart';
 import '../state/focus_state.dart';
 import '../state/notes_state.dart';
@@ -86,8 +89,30 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         // The user may have toggled system touch feedback or changed
         // devices settings while away: re-prime the haptic cache.
         HapticsCapabilities.refresh();
+        // Poll for app updates on resume (throttled): a Git push alone
+        // never notifies phones, so launch + resume checks are the whole
+        // delivery mechanism short of push notifications.
+        _maybeCheckUpdateOnResume();
       } catch (_) {}
     }
+  }
+
+  /// Throttled (6h) update poll on resume. Shows the shared update dialog
+  /// when a newer release exists and wasn't skipped. Never throws.
+  void _maybeCheckUpdateOnResume() {
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final last = LocalStore.instance.load('update_last_check_ms');
+      if (last is num && now - last < 6 * 60 * 60 * 1000) return;
+      LocalStore.instance.save('update_last_check_ms', now);
+      if (!mounted) return;
+      checkForUpdate().then((update) {
+        if (!mounted) return;
+        if (update != null) {
+          showUpdateDialog(context, update);
+        }
+      });
+    } catch (_) {}
   }
 
   void openTab(AppTab tab) {

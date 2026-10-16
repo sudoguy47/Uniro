@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'app/app.dart';
 import 'services/device_channel.dart';
 import 'services/error_log.dart';
-import 'domain/haptics.dart';import 'services/local_store.dart';
+import 'domain/haptics.dart';
+import 'services/local_store.dart';
 import 'services/notes_store.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
@@ -16,7 +16,7 @@ import 'state/app_state.dart';
 import 'state/focus_state.dart';
 import 'state/notes_state.dart';
 import 'state/routine_state.dart';
-import 'theme/app_colors.dart';
+import 'widgets/update_dialog.dart';
 
 void main() {
   // Global error capture first, so even bootstrap failures are logged.
@@ -135,8 +135,8 @@ void _maybeShowRecoveryBanner() {
 }
 
 /// One-shot in-app update check. Runs in the background after the first
-/// frame; shows the "Update available" dialog only when a newer GitHub
-/// release exists. Never throws, never blocks.
+/// frame; shows the shared update dialog (download + install in the app)
+/// only when a newer GitHub release exists. Never throws, never blocks.
 Future<void> _checkForUpdateOnce() async {
   final update = await checkForUpdate();
   if (update == null) return;
@@ -145,64 +145,7 @@ Future<void> _checkForUpdateOnce() async {
   // nav.mounted guards nav.context (same element).
   final ctx = nav.context;
   if (!ctx.mounted) return;
-  await showDialog<void>(
-    context: ctx,
-    barrierDismissible: true,
-    builder: (dialogCtx) {
-      final c = Theme.of(dialogCtx).extension<AppColors>()!;
-      return AlertDialog(
-        backgroundColor: c.cardBg,
-        title: const Text('Update available'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Version ${update.version} is ready.',
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              if (update.notes.trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(update.notes.trim(),
-                    style: TextStyle(
-                        fontSize: 13, color: c.textSecondary)),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Later'),
-          ),
-          TextButton(
-            onPressed: () {
-              skipUpdateVersion(update.tag);
-              Navigator.pop(dialogCtx);
-            },
-            child: const Text('Skip this version'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogCtx);
-              try {
-                await launchUrl(
-                  Uri.parse(update.apkUrl),
-                  mode: LaunchMode.externalApplication,
-                );
-              } catch (e) {
-                debugPrint('open apk link notice: $e');
-              }
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: c.accent,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Update'),
-          ),
-        ],
-      );
-    },
-  );
+  await showUpdateDialog(ctx, update);
 }
 
 /// Schedules non-critical warmup tasks during engine idle time.

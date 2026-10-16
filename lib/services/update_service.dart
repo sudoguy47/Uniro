@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'device_channel.dart';
 import 'local_store.dart';
 
 /// GitHub-Releases in-app update checker for the fully-offline Uniro app.
@@ -75,61 +78,229 @@ String prettyVersion(String tag) {
   return s.split('+').first;
 }
 
-/// Checks GitHub Releases for a newer build.
-///
-/// Returns an [AppUpdate] when the latest tag is newer than both the
-/// installed version AND the skipped version, otherwise null.
-/// Never throws — offline or any error yields null.
-Future<AppUpdate?> checkForUpdate() async {
+/// User-facing failure from download / verify / install steps.
+class UpdateException implements Exception {
+  UpdateException(this.message);
+  final String message;
+  @override
+  String toString() => 'UpdateException: $message';
+}
+
+/// Picks the correct APK download URL from a release `assets` list.
+/// Skips checksum/signature sidecars and non-APK files; prefers an asset
+/// whose *name* ends in `.apk`. Pure — unit-tested.
+String? selectApkAsset(dynamic assets) {
+  if (assets is! List) return null;
+  String? fallback;
+  for (final a in assets) {
+    if (a is! Map) continue;
+    final url = (a['browser_download_url'] as String?) ?? '';
+    final name = (a['name'] as String?) ?? '';
+    if (url.isEmpty) continue;
+    if (name.toLowerCase().endsWith('.apk')) return url;
+    fallback ??= url.toLowerCase().endsWith('.apk') ? url : null;
+  }
+  return fallback;
+}
+
+/// Builds an [AppUpdate] from one decoded release JSON object.
+/// Returns null for drafts, prereleases, missing/empty tags,
+/// equal-or-older versions, skipped tags, and releases without an APK.
+/// Pure — unit-tested.
+AppUpdate? parseUpdateResponse(
+  Map<String, dynamic> json, {
+  required String installed,
+  String? skipped,
+}) {
   try {
-    final info = await PackageInfo.fromPlatform();
-    // package_info_plus version is "1.0.0+1": compare the dotted part.
-    final installed = info.version;
-
-    final uri = Uri.https(
-      'api.github.com',
-      '/repos/$kGithubUser/$kGithubRepo/releases/latest',
-    );
-    final res = await http
-        .get(uri, headers: {'Accept': 'application/vnd.github+json'})
-        .timeout(const Duration(seconds: 5));
-    if (res.statusCode != 200) return null;
-
-    final json = jsonDecode(res.body);
-    if (json is! Map) return null;
+    if (json['draft'] == true || json['prerelease'] == true) return null;
     final tag = (json['tag_name'] as String?) ?? '';
     if (tag.isEmpty) return null;
     if (compareVersions(tag, installed) <= 0) return null;
-
-    final skipped = LocalStore.instance.load(_skipKey) as String?;
-    if (skipped == tag) return null;
-
-    String apkUrl = '';
-    final assets = json['assets'];
-    if (assets is List) {
-      for (final a in assets) {
-        if (a is! Map) continue;
-        final url = (a['browser_download_url'] as String?) ?? '';
-        final name = (a['name'] as String?) ?? '';
-        if (url.isNotEmpty &&
-            (name.toLowerCase().endsWith('.apk') ||
-                url.toLowerCase().endsWith('.apk'))) {
-          apkUrl = url;
-          break;
-        }
-      }
-    }
-    if (apkUrl.isEmpty) return null;
-
+    if (skipped != null && skipped == tag) return null;
+    final apkUrl = selectApkAsset(json['assets']);
+    if (apkUrl == null || apkUrl.isEmpty) return null;
     return AppUpdate(
       tag: tag,
       version: prettyVersion(tag),
       notes: (json['body'] as String?) ?? '',
       apkUrl: apkUrl,
     );
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Checks GitHub Releases for a newer build.
+///
+/// Returns an [AppUpdate] when the latest *stable* release is newer than
+/// both the installed version AND the skipped version, otherwise null.
+/// Never throws — offline, rate limits (403/429), 404s, or any error
+/// yield null. Optional [client]/[installedOverride] exist for tests.
+Future<AppUpdate?> checkForUpdate(
+    {http.Client? client, String? installedOverride}) async {
+  final http.Client httpClient = client ?? http.Client();
+  final bool ownsClient = client == null;
+  try {
+    String installed;
+    if (installedOverride != null) {
+      installed = installedOverride;
+    } else {
+      final info = await PackageInfo.fromPlatform();
+      // package_info_plus version is "1.0.1+2003": compare the dotted part.
+      installed = info.version;
+    }
+
+    final uri = Uri.https(
+      'api.github.com',
+      '/repos/$kGithubUser/$kGithubRepo/releases/latest',
+    );
+    final res = await httpClient
+        .get(uri, headers: {'Accept': 'application/vnd.github+json'})
+        .timeout(const Duration(seconds: 10));
+    if (res.statusCode == 403 || res.statusCode == 429) {
+      debugPrint('update check rate-limited (${res.statusCode})');
+      return null;
+    }
+    if (res.statusCode == 404) {
+      // No published releases yet (or repo invisible).
+      return null;
+    }
+    if (res.statusCode != 200) return null;
+
+    final json = jsonDecode(res.body);
+    if (json is! Map<String, dynamic>) return null;
+    final skipped = LocalStore.instance.load(_skipKey) as String?;
+    return parseUpdateResponse(json, installed: installed, skipped: skipped);
   } catch (e) {
     debugPrint('update check notice: $e');
     return null;
+  } finally {
+    if (ownsClient) httpClient.close();
+  }
+}
+
+/// Downloads [update]'s APK to the app cache directory, reporting
+/// `(receivedBytes, totalBytes?)` via [onProgress]. Aborts promptly when
+/// [isCancelled] returns true (partial file is deleted).
+/// Throws [UpdateException] with a user-readable message on failure.
+Future<File> downloadUpdate(
+  AppUpdate update, {
+  void Function(int received, int? total)? onProgress,
+  bool Function()? isCancelled,
+}) async {
+  final client = http.Client();
+  File? outFile;
+  try {
+    final req = http.Request('GET', Uri.parse(update.apkUrl));
+    req.headers['Accept'] = 'application/octet-stream';
+    final res = await client.send(req).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw UpdateException(
+          'Download failed (server ${res.statusCode}). Try again.');
+    }
+    final cacheDir = await DeviceChannel.getCacheDir();
+    if (cacheDir == null || cacheDir.isEmpty) {
+      throw UpdateException('Cannot access app storage.');
+    }
+    final safeTag = update.tag.replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+    outFile = File('$cacheDir/uniro-$safeTag.apk');
+    if (await outFile.exists()) await outFile.delete();
+    final sink = outFile.openWrite();
+    try {
+      var received = 0;
+      final total = res.contentLength;
+      await for (final chunk in res.stream) {
+        if (isCancelled?.call() == true) {
+          throw UpdateException('cancelled');
+        }
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      }
+    } finally {
+      await sink.close();
+    }
+    if (isCancelled?.call() == true || !await outFile.exists()) {
+      try {
+        await outFile.delete();
+      } catch (_) {}
+      throw UpdateException('cancelled');
+    }
+    return outFile;
+  } on UpdateException {
+    rethrow;
+  } catch (e) {
+    try {
+      await outFile?.delete();
+    } catch (_) {}
+    throw UpdateException('Download failed. Check connection and retry.');
+  } finally {
+    client.close();
+  }
+}
+
+/// Result of pre-install verification of a downloaded APK.
+class InstallReadiness {
+  const InstallReadiness({
+    required this.ok,
+    required this.reason,
+    this.packageName = '',
+    this.versionCode = 0,
+  });
+  final bool ok;
+  final String reason;
+  final String packageName;
+  final int versionCode;
+}
+
+/// Verifies a downloaded APK before install: same applicationId, higher
+/// versionCode than installed, and identical signing certificate.
+/// Never throws — failures return `ok: false` with a user-readable reason.
+Future<InstallReadiness> checkInstallReadiness(File apk) async {
+  try {
+    if (!await apk.exists()) {
+      return const InstallReadiness(
+          ok: false, reason: 'Downloaded file is missing.');
+    }
+    final info = await PackageInfo.fromPlatform();
+    final currentCode = int.tryParse(info.buildNumber) ?? 0;
+    final res = await DeviceChannel.verifyApk(
+      apk.path,
+      expectedPackage: info.packageName,
+      minVersionCode: currentCode + 1,
+    );
+    if (res == null) {
+      return const InstallReadiness(
+          ok: false, reason: 'Could not read the APK file.');
+    }
+    if (res['packageOk'] != true) {
+      return InstallReadiness(
+          ok: false,
+          reason: 'Wrong app package (${res['packageName'] ?? '?'}).',
+          packageName: '${res['packageName'] ?? ''}');
+    }
+    if (res['upgradeOk'] != true) {
+      return InstallReadiness(
+          ok: false,
+          reason: 'This file is not newer than the installed app.',
+          packageName: '${res['packageName'] ?? ''}',
+          versionCode: (res['versionCode'] as num?)?.toInt() ?? 0);
+    }
+    if (res['signatureOk'] != true) {
+      return const InstallReadiness(
+          ok: false,
+          reason: 'Signature mismatch — install blocked for safety.');
+    }
+    return InstallReadiness(
+        ok: true,
+        reason: 'verified',
+        packageName: '${res['packageName'] ?? ''}',
+        versionCode: (res['versionCode'] as num?)?.toInt() ?? 0);
+  } catch (e) {
+    debugPrint('install readiness notice: $e');
+    return const InstallReadiness(
+        ok: false, reason: 'Verification failed. Try again.');
   }
 }
 
@@ -142,7 +313,27 @@ void skipUpdateVersion(String tag) {
   }
 }
 
-/// Installed version string for "Check for updates" rows, e.g. "1.0.0".
+/// Opens Android's package installer for a verified [apk].
+/// Returns `'launched'` or `'needPermission'` (user must allow "install
+/// unknown apps" in system settings, then retry). Throws [UpdateException]
+/// when no installer handles the file. NOTE: Android always asks the user
+/// to confirm — silent background installs are impossible for this app.
+Future<String> launchInstaller(File apk) async {
+  try {
+    final res = await DeviceChannel.installApk(apk.path);
+    if (res == 'launched' || res == 'needPermission') return res;
+    throw UpdateException('Could not open the installer.');
+  } on UpdateException {
+    rethrow;
+  } on PlatformException catch (e) {
+    throw UpdateException(e.message ?? 'Could not open the installer.');
+  } catch (e) {
+    if (e is UpdateExceptionBridge) throw UpdateException(e.message);
+    throw UpdateException('Could not open the installer.');
+  }
+}
+
+/// Installed version string for "Check for updates" rows, e.g. "1.0.1".
 Future<String> installedVersion() async {
   try {
     final info = await PackageInfo.fromPlatform();
