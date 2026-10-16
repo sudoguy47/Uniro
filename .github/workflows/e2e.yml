@@ -1,8 +1,42 @@
 name: Editor verification
 on:
   pull_request:
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'tests/**'
+      - 'e2e-army/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'package-lock.json'
+      - 'e2e.config.ts'
+      - 'next.config.mjs'
+      - 'postcss.config.mjs'
+      - 'tailwind.config.ts'
+      - 'tsconfig.json'
+      - 'components.json'
+      - 'app-store-screenshots.json'
+      - '.github/workflows/e2e.yml'
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'tests/**'
+      - 'e2e-army/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'package-lock.json'
+      - 'e2e.config.ts'
+      - 'next.config.mjs'
+      - 'postcss.config.mjs'
+      - 'tailwind.config.ts'
+      - 'tsconfig.json'
+      - 'components.json'
+      - 'app-store-screenshots.json'
+      - '.github/workflows/e2e.yml'
 permissions:
   contents: read
 jobs:
