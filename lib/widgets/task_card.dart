@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import '../models/task.dart';
 import '../theme/app_colors.dart';
 import '../domain/task_utils.dart';
@@ -37,7 +37,7 @@ class TaskCard extends StatelessWidget {
   // ── Static Geometry & Spacing Constants (Zero Runtime Allocation) ──
   static const EdgeInsets _cardMargin =
       EdgeInsets.only(bottom: TaskCard.cardMarginBottom);
-  static const EdgeInsets _cardPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+  static const EdgeInsets _cardPadding = EdgeInsets.symmetric(horizontal: 14, vertical: 6);
   static const EdgeInsets _deletePadding = EdgeInsets.all(4);
 
   static const SizedBox _gapW12 = SizedBox(width: 12);
@@ -74,7 +74,7 @@ class TaskCard extends StatelessWidget {
 
     return RepaintBoundary(
       child: Container(
-        height: TaskCard.cardHeight,
+        constraints: const BoxConstraints(minHeight: TaskCard.cardHeight),
         margin: _cardMargin,
         padding: _cardPadding,
         decoration: cardDecoration,
@@ -120,7 +120,7 @@ class TaskCard extends StatelessWidget {
                 if (showCompleted && onDelete != null) ...[
                   GestureDetector(
                     onTap: () {
-                      HapticFeedback.lightImpact();
+                      PremiumHaptics.tap();
                       onDelete!();
                     },
                     child: Padding(
@@ -200,7 +200,7 @@ class _TaskCheckButtonState extends State<_TaskCheckButton>
   }
 
   Future<void> _handleTap() async {
-    HapticFeedback.mediumImpact();
+    PremiumHaptics.confirm();
     // Fire the completion immediately so the UI responds in the same frame;
     // run the scale animation unawaited so it never delays state updates.
     widget.onComplete();

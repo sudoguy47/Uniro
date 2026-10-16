@@ -36,17 +36,43 @@ class RoutineState extends ChangeNotifier {
   }
 
   Future<void> load() async {
-    final rawCourses = LocalStore.instance.load('courses');
-    if (rawCourses is List) {
-      _courses = rawCourses
-          .map((j) => Course.fromJson(Map<String, dynamic>.from(j as Map)))
-          .toList();
-    }
-    final rawSlots = LocalStore.instance.load('slots');
-    if (rawSlots is List) {
-      _slots = rawSlots
-          .map((j) => ClassSlot.fromJson(Map<String, dynamic>.from(j as Map)))
-          .toList();
+    try {
+      final rawCourses = LocalStore.instance.load('courses');
+      if (rawCourses is List) {
+        final parsed = <Course>[];
+        for (final j in rawCourses) {
+          try {
+            if (j is Map) {
+              parsed.add(Course.fromJson(Map<String, dynamic>.from(j)));
+            } else {
+              LocalStore.instance.markRecovery();
+            }
+          } catch (_) {
+            LocalStore.instance.markRecovery();
+            continue;
+          }
+        }
+        _courses = parsed;
+      }
+      final rawSlots = LocalStore.instance.load('slots');
+      if (rawSlots is List) {
+        final parsed = <ClassSlot>[];
+        for (final j in rawSlots) {
+          try {
+            if (j is Map) {
+              parsed.add(ClassSlot.fromJson(Map<String, dynamic>.from(j)));
+            } else {
+              LocalStore.instance.markRecovery();
+            }
+          } catch (_) {
+            LocalStore.instance.markRecovery();
+            continue;
+          }
+        }
+        _slots = parsed;
+      }
+    } catch (_) {
+      LocalStore.instance.markRecovery();
     }
     // One-time migration from the old dashboard mini-routine
     // (ClassRoutineEntry: dayOfWeek 0–6) → Course + ClassSlot.

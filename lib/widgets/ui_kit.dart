@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../models/task.dart';
@@ -99,7 +99,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
         setState(() => _pressed = false);
-        HapticFeedback.lightImpact(); // GymMane haptic
+        PremiumHaptics.tap(); // GymMane haptic
         widget.onPressed?.call();
       },
       onTapCancel: () => setState(() => _pressed = false),
@@ -145,7 +145,7 @@ class TinySwitch extends StatelessWidget {
     final c = Theme.of(context).extension<AppColors>()!;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.lightImpact();
+        PremiumHaptics.tap();
         onChanged(!value);
       },
       child: AnimatedContainer(
@@ -191,7 +191,7 @@ class AppFilterChip extends StatelessWidget {
     final c = Theme.of(context).extension<AppColors>()!;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.selectionClick();
+        PremiumHaptics.select();
         onTap();
       },
       child: AnimatedContainer(
@@ -261,7 +261,7 @@ class _StepperControlState extends State<StepperControl>
   void _change(int delta) {
     final next = widget.value + delta;
     if (next < widget.min || next > widget.max) return;
-    HapticFeedback.selectionClick();
+    PremiumHaptics.select();
     // GymMane: number bounces on change
     _scaleCtrl.forward().then((_) => _scaleCtrl.reverse());
     widget.onChanged(next);
@@ -339,7 +339,7 @@ class PrioritySelector extends StatelessWidget {
         return Expanded(
           child: GestureDetector(
             onTap: () {
-              HapticFeedback.selectionClick();
+              PremiumHaptics.select();
               onChange(p);
             },
             child: AnimatedContainer(
@@ -390,7 +390,7 @@ class RadioListItem extends StatelessWidget {
     final c = Theme.of(context).extension<AppColors>()!;
     return GestureDetector(
       onTap: () {
-        HapticFeedback.selectionClick();
+        PremiumHaptics.select();
         onTap();
       },
       behavior: HitTestBehavior.opaque,

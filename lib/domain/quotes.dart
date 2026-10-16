@@ -78,6 +78,20 @@ String quoteOfTheDay(DateTime now) {
   return kQuotes[dayOfYear % kQuotes.length];
 }
 
+/// Strips wrapping quotation marks (straight or curly, single or double)
+/// so dashboard quotes never render with "..." around them, no matter
+/// how the source string is punctuated.
+String stripQuoteMarks(String s) {
+  const marks = {'"', '“', '”', "'", '‘', '’'};
+  var out = s.trim();
+  while (out.length >= 2 &&
+      marks.contains(out[0]) &&
+      marks.contains(out[out.length - 1])) {
+    out = out.substring(1, out.length - 1).trim();
+  }
+  return out;
+}
+
 /// "Remember today" line: counts today's pending tasks (dueDate == today)
 /// and today's classes (weekday match). Pure; callers pass plain data.
 String todayAgendaLine({

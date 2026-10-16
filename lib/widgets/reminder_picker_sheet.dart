@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import '../models/task.dart';
 import '../theme/app_colors.dart';
 import 'ui_kit.dart';
@@ -123,7 +123,7 @@ class _ReminderPickerSheetState extends State<ReminderPickerSheet> {
                       PrimaryButton(
                         label: 'Add Reminder',
                         onPressed: () {
-                          HapticFeedback.lightImpact();
+                          PremiumHaptics.tap();
                           final reminder = Reminder(
                             type: _selectedType,
                             customDays: _selectedType == ReminderType.custom

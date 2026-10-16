@@ -11,10 +11,27 @@ def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    // Fail fast with a clear message instead of AGP's cryptic signing
+    // error: every field must be present and the keystore file must exist.
+    // Only the storeFile *path* is echoed here — never passwords.
+    def missingKey = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword']
+        .find { k -> keystoreProperties[k] == null || !keystoreProperties[k].trim() }
+    if (missingKey != null) {
+        throw new GradleException(
+            "android/key.properties is missing '${missingKey}'. " +
+            "See android/KEYSTORE.md — and never commit this file.")
+    }
+    def configuredStore = file(keystoreProperties['storeFile'])
+    if (!configuredStore.isFile()) {
+        throw new GradleException(
+            "Release keystore not found at '${keystoreProperties['storeFile']}' " +
+            "(from android/key.properties). Place your .jks there or fix " +
+            "storeFile. See android/KEYSTORE.md.")
+    }
 }
 
 android {
-    namespace "com.example.uniro1"
+    namespace "dev.sudoguy.uniro"
     compileSdk flutter.compileSdkVersion
     ndkVersion flutter.ndkVersion
 
@@ -28,7 +45,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.uniro1"
+        applicationId "dev.sudoguy.uniro"
         minSdk flutter.minSdkVersion
         targetSdk flutter.targetSdkVersion
         versionCode flutter.versionCode

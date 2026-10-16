@@ -32,6 +32,27 @@ void main() {
     });
   });
 
+  group('stripQuoteMarks', () {
+    test('removes wrapping double quotes', () {
+      expect(stripQuoteMarks('"Grow through what you go through."'),
+          'Grow through what you go through.');
+    });
+
+    test('removes curly quotes and trims', () {
+      expect(stripQuoteMarks('  “Be better, not perfect.”  '),
+          'Be better, not perfect.');
+    });
+
+    test('leaves plain quotes untouched', () {
+      expect(stripQuoteMarks('Stay humble, dream big.'),
+          'Stay humble, dream big.');
+    });
+
+    test('leaves unbalanced marks alone', () {
+      expect(stripQuoteMarks('"Unbalanced'), '"Unbalanced');
+    });
+  });
+
   group('todayAgendaLine', () {
     test('empty schedule', () {
       expect(todayAgendaLine(classCount: 0, taskCount: 0),

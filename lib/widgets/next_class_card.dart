@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../models/class_slot.dart';
 import '../state/routine_state.dart';
@@ -77,7 +77,7 @@ class _NextClassCardState extends State<NextClassCard> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: GestureDetector(
           onTap: () {
-            HapticFeedback.lightImpact();
+            PremiumHaptics.tap();
             widget.onTap();
           },
           behavior: HitTestBehavior.opaque,
@@ -117,6 +117,8 @@ class _NextClassCardState extends State<NextClassCard> {
                       Text(
                         '${_fmt(slot.startMinutes, context)} – ${_fmt(slot.endMinutes, context)}'
                         '${room.isNotEmpty ? ' · $room' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
                           color: c.navActiveText.withValues(alpha: 0.8),
@@ -125,20 +127,25 @@ class _NextClassCardState extends State<NextClassCard> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: c.accent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
