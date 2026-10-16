@@ -156,7 +156,13 @@ class FocusState extends ChangeNotifier {
         running = false;
         runId = null;
       } else {
-        _startTicker();
+        // The process died mid-run (user quit / OS kill) with time left:
+        // auto-pause instead of silently resuming. A resumed run hides
+        // the bottom nav on every tab with no affordance to stop it;
+        // a paused run keeps the remaining time and offers Resume
+        // on the Focus tab.
+        paused = true;
+        pausedRemainingSec = left;
       }
     }
     _saveEngine();
