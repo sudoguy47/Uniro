@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../domain/haptics.dart';
+import '../domain/sample_data.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/update_dialog.dart';
@@ -404,6 +405,10 @@ class _ProfileScreenState extends State<ProfileScreen>
               const _UpdateCard(),
               const SizedBox(height: 16),
 
+              // Example data: load the tour bundle anytime, hide it again.
+              const _ExamplesCard(),
+              const SizedBox(height: 16),
+
               // Theme Settings Card
               Container(
                 padding: const EdgeInsets.all(20),
@@ -797,6 +802,106 @@ class _GalleryPermissionTileState extends State<_GalleryPermissionTile>
           Icon(Icons.check_circle_outline,
               size: 20, color: c.textSecondary),
       ],
+    );
+  }
+}
+
+/// Profile > Example data: load the tour bundle on demand, or hide it
+/// again. Toggles its label based on whether samples are present.
+class _ExamplesCard extends StatefulWidget {
+  const _ExamplesCard();
+
+  @override
+  State<_ExamplesCard> createState() => _ExamplesCardState();
+}
+
+class _ExamplesCardState extends State<_ExamplesCard> {
+  bool _busy = false;
+
+  Future<void> _toggle() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final app = context.read<AppState>();
+      final routine = context.read<RoutineState>();
+      final notes = context.read<NotesState>();
+      if (hasExampleData(app, routine, notes)) {
+        PremiumHaptics.confirm();
+        await hideExampleData(app: app, routine: routine, notes: notes);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Example data hidden.')),
+        );
+      } else {
+        PremiumHaptics.confirm();
+        await seedExampleData(app: app, routine: routine, notes: notes);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Example data loaded.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final showing = hasExampleData(
+      context.watch<AppState>(),
+      context.watch<RoutineState>(),
+      context.watch<NotesState>(),
+    );
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: c.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Example data',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: c.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  showing
+                      ? 'Sample tasks, classes and notes are visible'
+                      : 'Explore the app with sample content',
+                  style: TextStyle(fontSize: 13, color: c.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton(
+            onPressed: _busy ? null : _toggle,
+            style: FilledButton.styleFrom(
+              backgroundColor: c.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(_busy
+                ? 'Working…'
+                : showing
+                    ? 'Hide examples'
+                    : 'Show examples'),
+          ),
+        ],
+      ),
     );
   }
 }

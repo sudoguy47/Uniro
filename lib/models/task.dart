@@ -47,6 +47,9 @@ class Task {
   final String createdAt;
   final String? completedAt;
   final String? courseId;
+  /// True for built-in example content (seeded from the dashboard
+  /// "Use examples" prompt). Lets "Hide examples" remove exactly these.
+  final bool isSample;
 
   Task({
     String? id,
@@ -62,6 +65,7 @@ class Task {
     String? createdAt,
     this.completedAt,
     this.courseId,
+    this.isSample = false,
   })  : id = id ?? newLocalId(),
         createdAt = createdAt ?? DateTime.now().toIso8601String();
 
@@ -79,6 +83,7 @@ class Task {
     bool clearCompletedAt = false,
     String? courseId,
     bool clearCourseId = false,
+    bool? isSample,
   }) => Task(
     id: id,
     createdAt: createdAt,
@@ -93,6 +98,7 @@ class Task {
     reminders: reminders ?? this.reminders,
     completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
     courseId: clearCourseId ? null : (courseId ?? this.courseId),
+    isSample: isSample ?? this.isSample,
   );
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +115,7 @@ class Task {
     'createdAt': createdAt,
     'completedAt': completedAt,
     'courseId': courseId,
+    if (isSample) 'isSample': true,
   };
 
   factory Task.fromJson(Map<String, dynamic> j) => Task(
@@ -127,5 +134,6 @@ class Task {
     createdAt: j['createdAt'],
     completedAt: j['completedAt'],
     courseId: j['courseId'] as String?,
+    isSample: j['isSample'] as bool? ?? false,
   );
 }

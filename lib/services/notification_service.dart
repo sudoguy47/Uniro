@@ -192,7 +192,12 @@ class NotificationService {
   /// Schedules notifications for a task based on due date/time and reminders.
   Future<void> scheduleForTask(Task task) async {
     if (kIsWeb) return;
-    if (!_initialized) await init();
+    try {
+      if (!_initialized) await init();
+    } catch (e) {
+      debugPrint('scheduleForTask init notice: $e');
+      return;
+    }
     if (task.status == TaskStatus.completed) {
       await cancelForTask(task);
       return;

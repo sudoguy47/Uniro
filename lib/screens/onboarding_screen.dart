@@ -79,6 +79,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Hide the keyboard first so it never lingers over the next slide,
     // then give the press its tick.
     FocusManager.instance.primaryFocus?.unfocus();
+    // The name slide (index 2) is a hard gate: no empty name, no advance.
+    if (_currentPage == 2 && _nameController.text.trim().isEmpty) {
+      PremiumHaptics.edge();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your name to continue.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
     PremiumHaptics.tap();
     if (_currentPage < 3) {
       _pageController.nextPage(
@@ -139,6 +150,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     // Swiped slides must also drop the keyboard (the name
                     // field keeps focus otherwise and covers the next slide).
                     FocusManager.instance.primaryFocus?.unfocus();
+                    // Swipe-around guard: the name gate applies to swipes too.
+                    if (page == 3 &&
+                        _nameController.text.trim().isEmpty) {
+                      _pageController.jumpToPage(2);
+                      PremiumHaptics.edge();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content:
+                              Text('Please enter your name to continue.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                      return;
+                    }
                     setState(() => _currentPage = page);
                     SystemChrome.setSystemUIOverlayStyle(
                       const SystemUiOverlayStyle(

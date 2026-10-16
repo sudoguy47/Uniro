@@ -187,6 +187,8 @@ class Note {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? courseId;
+  /// True for built-in example content ("Use examples" seed).
+  final bool isSample;
 
   const Note({
     required this.id,
@@ -199,6 +201,7 @@ class Note {
     required this.createdAt,
     required this.updatedAt,
     this.courseId,
+    this.isSample = false,
   });
 
   bool get isEmpty =>
@@ -220,6 +223,7 @@ class Note {
     DateTime? updatedAt,
     String? courseId,
     bool clearCourseId = false,
+    bool? isSample,
   }) => Note(
     id: id,
     title: title ?? this.title,
@@ -231,6 +235,7 @@ class Note {
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     courseId: clearCourseId ? null : (courseId ?? this.courseId),
+    isSample: isSample ?? this.isSample,
   );
 
   Map<String, dynamic> toJson() => {
@@ -244,6 +249,7 @@ class Note {
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
     'courseId': courseId,
+    if (isSample) 'isSample': true,
   };
 
   factory Note.fromJson(Map<String, dynamic> j) => Note(
@@ -259,6 +265,7 @@ class Note {
     createdAt: DateTime.parse(j['createdAt'] as String),
     updatedAt: DateTime.parse(j['updatedAt'] as String),
     courseId: j['courseId'] as String?,
+    isSample: j['isSample'] as bool? ?? false,
   );
 }
 

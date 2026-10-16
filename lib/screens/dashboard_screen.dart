@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
+import '../services/local_store.dart';
+import '../domain/sample_data.dart';
 import '../state/app_state.dart';
+import '../state/notes_state.dart';
+import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
 import '../models/task.dart';
 import '../widgets/task_card.dart';
@@ -56,6 +60,65 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (context.read<AppState>().settings.dashboardView == 'completed') {
       _completedSeen = true;
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOfferExamples());
+  }
+
+  /// First-run empty state: when nothing exists anywhere yet, offer the
+  /// example bundle once. Never nags again after the first answer.
+  Future<void> _maybeOfferExamples() async {
+    if (!mounted) return;
+    try {
+      final app = context.read<AppState>();
+      final routine = context.read<RoutineState>();
+      final notes = context.read<NotesState>();
+      if (app.tasks.isNotEmpty ||
+          routine.courses.isNotEmpty ||
+          notes.allNotes.isNotEmpty) {
+        return;
+      }
+      if (LocalStore.instance.load('examples_offered') == true) return;
+      LocalStore.instance.save('examples_offered', true);
+      if (!mounted) return;
+      final use = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogCtx) {
+          final c = Theme.of(dialogCtx).extension<AppColors>()!;
+          return AlertDialog(
+            backgroundColor: c.cardBg,
+            title: const Text('Explore with examples?'),
+            content: Text(
+              'See Uniro filled with sample tasks, classes and notes. '
+              'You can hide them anytime.',
+              style: TextStyle(fontSize: 14, color: c.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: const Text('Start empty'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogCtx, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: c.accent,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Use examples'),
+              ),
+            ],
+          );
+        },
+      );
+      if (use == true && mounted) {
+        PremiumHaptics.confirm();
+        await seedExampleData(app: app, routine: routine, notes: notes);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -178,6 +241,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     widget.onNavigateToRoutine?.call(),
                               ),
                             ),
+                            const _ExamplesBanner(),
                             const SliverToBoxAdapter(child: _HeroSection()),
                             const SliverToBoxAdapter(
                                 child: _WeeklyLoadSection()),
@@ -677,6 +741,73 @@ class _DashboardHeaderState extends State<_DashboardHeader> {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Banner shown while example content is present, with the
+/// "Hide examples" escape hatch. Disappears on its own once the last
+/// sample item is gone (selectors rebuild it away).
+class _ExamplesBanner extends StatelessWidget {
+  const _ExamplesBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final has = context.select((AppState s) => s.tasks.any((t) => t.isSample)) ||
+        context.select((RoutineState r) => r.courses.any((c) => c.isSample)) ||
+        context.select((NotesState n) => n.allNotes.any((x) => x.isSample));
+    if (!has) return const SliverToBoxAdapter(child: SizedBox.shrink());
+    final c = Theme.of(context).extension<AppColors>()!;
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: c.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "You're viewing example data",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13, color: c.textSecondary),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () async {
+                  PremiumHaptics.confirm();
+                  try {
+                    await hideExampleData(
+                      app: context.read<AppState>(),
+                      routine: context.read<RoutineState>(),
+                      notes: context.read<NotesState>(),
+                    );
+                  } catch (_) {}
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Text(
+                    'Hide examples',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: c.accent,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

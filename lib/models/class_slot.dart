@@ -13,6 +13,8 @@ class ClassSlot {
   final int endMinutes;
   final String? room;
   final int? reminderMinutesBefore;
+  /// True for built-in example content ("Use examples" seed).
+  final bool isSample;
 
   ClassSlot({
     String? id,
@@ -22,6 +24,7 @@ class ClassSlot {
     required this.endMinutes,
     this.room,
     this.reminderMinutesBefore = 15,
+    this.isSample = false,
   }) : id = id ?? newLocalId();
 
   ClassSlot copyWith({
@@ -33,6 +36,7 @@ class ClassSlot {
     bool clearRoom = false,
     int? reminderMinutesBefore,
     bool clearReminder = false,
+    bool? isSample,
   }) =>
       ClassSlot(
         id: id,
@@ -44,6 +48,7 @@ class ClassSlot {
         reminderMinutesBefore: clearReminder
             ? null
             : (reminderMinutesBefore ?? this.reminderMinutesBefore),
+        isSample: isSample ?? this.isSample,
       );
 
   Map<String, dynamic> toJson() => {
@@ -54,6 +59,7 @@ class ClassSlot {
         'endMinutes': endMinutes,
         'room': room,
         'reminderMinutesBefore': reminderMinutesBefore,
+        if (isSample) 'isSample': true,
       };
 
   factory ClassSlot.fromJson(Map<String, dynamic> j) => ClassSlot(
@@ -65,6 +71,7 @@ class ClassSlot {
         room: j['room'] as String?,
         reminderMinutesBefore:
             (j['reminderMinutesBefore'] as num?)?.toInt(),
+        isSample: j['isSample'] as bool? ?? false,
       );
 }
 

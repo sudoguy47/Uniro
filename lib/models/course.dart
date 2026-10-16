@@ -9,6 +9,8 @@ class Course {
   final String? teacher;
   final String? room;
   final double? credits;
+  /// True for built-in example content ("Use examples" seed).
+  final bool isSample;
 
   Course({
     String? id,
@@ -18,6 +20,7 @@ class Course {
     this.teacher,
     this.room,
     this.credits,
+    this.isSample = false,
   }) : id = id ?? newLocalId();
 
   /// Built-in palette for course color tags.
@@ -44,6 +47,7 @@ class Course {
     bool clearRoom = false,
     double? credits,
     bool clearCredits = false,
+    bool? isSample,
   }) =>
       Course(
         id: id,
@@ -53,6 +57,7 @@ class Course {
         teacher: clearTeacher ? null : (teacher ?? this.teacher),
         room: clearRoom ? null : (room ?? this.room),
         credits: clearCredits ? null : (credits ?? this.credits),
+        isSample: isSample ?? this.isSample,
       );
 
   Map<String, dynamic> toJson() => {
@@ -63,6 +68,7 @@ class Course {
         'teacher': teacher,
         'room': room,
         'credits': credits,
+        if (isSample) 'isSample': true,
       };
 
   factory Course.fromJson(Map<String, dynamic> j) => Course(
@@ -73,5 +79,6 @@ class Course {
         teacher: j['teacher'] as String?,
         room: j['room'] as String?,
         credits: (j['credits'] as num?)?.toDouble(),
+        isSample: j['isSample'] as bool? ?? false,
       );
 }
