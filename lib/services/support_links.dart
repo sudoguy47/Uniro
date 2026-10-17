@@ -41,9 +41,21 @@ Future<bool> openExternalLink(String url) async {
   }
 }
 
-/// Opens the configured Telegram support link. False when unconfigured
-/// or when the launch fails. Never throws.
-Future<bool> openTelegramSupport() => openExternalLink(kTelegramSupportUrl);
+/// Opens the configured Telegram support link. Tries the Telegram app deep link
+/// first, then falls back to the web link. False when unconfigured or launch fails.
+/// Never throws.
+Future<bool> openTelegramSupport() async {
+  if (!hasTelegramSupport) return false;
+  final deepLink = Uri.parse('tg://resolve?domain=Hold_on47');
+  try {
+    if (await canLaunchUrl(deepLink)) {
+      final ok =
+          await launchUrl(deepLink, mode: LaunchMode.externalApplication);
+      if (ok) return true;
+    }
+  } catch (_) {}
+  return openExternalLink(kTelegramSupportUrl);
+}
 
 /// Opens the configured GitHub profile link. False when unconfigured
 /// or when the launch fails. Never throws.

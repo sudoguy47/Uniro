@@ -14,10 +14,10 @@ import '../state/app_state.dart';
 import '../state/notes_state.dart';
 import '../state/routine_state.dart';
 import '../widgets/battery_guide.dart';
-import '../widgets/support_dialog.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
+import '../services/support_links.dart';
 import '../widgets/ui_kit.dart';
 import 'courses_screen.dart';
 
@@ -638,8 +638,14 @@ class _HelpCardState extends State<_HelpCard> {
         return;
       }
       if (!mounted) return;
-      // The dialog itself confirms the copy and offers support links.
-      await showSupportDialog(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diagnostics copied! Opening Telegram…'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      // Automatically pop up / open Telegram profile so the user can send diagnostics
+      await openTelegramSupport();
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -696,6 +702,109 @@ class _HelpCardState extends State<_HelpCard> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: c.border),
+          const SizedBox(height: 12),
+          Text(
+            'Support & Developer',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: c.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Telegram support link
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: openTelegramSupport,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: c.inputBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: c.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.send_rounded, size: 18, color: c.accent),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Telegram Support',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            '@Hold_on47',
+                            style: TextStyle(
+                                fontSize: 12, color: c.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.open_in_new_rounded,
+                        size: 16, color: c.textSecondary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // GitHub profile link
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: openGitHubProfile,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: c.inputBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: c.border),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.code_rounded, size: 18, color: c.accent),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'GitHub Profile',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'github.com/sudoguy47',
+                            style: TextStyle(
+                                fontSize: 12, color: c.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.open_in_new_rounded,
+                        size: 16, color: c.textSecondary),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
