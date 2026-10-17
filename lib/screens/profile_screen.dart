@@ -14,6 +14,7 @@ import '../state/app_state.dart';
 import '../state/notes_state.dart';
 import '../state/routine_state.dart';
 import '../widgets/battery_guide.dart';
+import '../widgets/support_dialog.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
@@ -612,22 +613,33 @@ class _HelpCardState extends State<_HelpCard> {
     setState(() => _busy = true);
     try {
       if (!mounted) return;
-      final text = await buildDiagnosticsText(
-        app: context.read<AppState>(),
-        routine: context.read<RoutineState>(),
-        notes: context.read<NotesState>(),
-        context: context,
-      );
-      await Clipboard.setData(ClipboardData(text: text));
+      late final String text;
+      try {
+        text = await buildDiagnosticsText(
+          app: context.read<AppState>(),
+          routine: context.read<RoutineState>(),
+          notes: context.read<NotesState>(),
+          context: context,
+        );
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't build diagnostics.")),
+        );
+        return;
+      }
+      try {
+        await Clipboard.setData(ClipboardData(text: text));
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't copy to clipboard.")),
+        );
+        return;
+      }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Diagnostics copied.')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't build diagnostics.")),
-      );
+      // The dialog itself confirms the copy and offers support links.
+      await showSupportDialog(context);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -860,10 +872,27 @@ class _ExamplesCardState extends State<_ExamplesCard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: c.border),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 340;
+          final button = FilledButton(
+            onPressed: _busy ? null : _toggle,
+            style: FilledButton.styleFrom(
+              backgroundColor: c.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(_busy
+                ? 'Working…'
+                : showing
+                    ? 'Hide examples'
+                    : 'Show examples'),
+          );
+
+          if (isNarrow) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -881,26 +910,44 @@ class _ExamplesCardState extends State<_ExamplesCard> {
                       : 'Explore the app with sample content',
                   style: TextStyle(fontSize: 13, color: c.textSecondary),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: button,
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton(
-            onPressed: _busy ? null : _toggle,
-            style: FilledButton.styleFrom(
-              backgroundColor: c.accent,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Example data',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: c.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      showing
+                          ? 'Sample tasks, classes and notes are visible'
+                          : 'Explore the app with sample content',
+                      style: TextStyle(fontSize: 13, color: c.textSecondary),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            child: Text(_busy
-                ? 'Working…'
-                : showing
-                    ? 'Hide examples'
-                    : 'Show examples'),
-          ),
-        ],
+              const SizedBox(width: 12),
+              button,
+            ],
+          );
+        },
       ),
     );
   }
