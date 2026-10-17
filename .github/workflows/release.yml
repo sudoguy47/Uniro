@@ -81,20 +81,15 @@ jobs:
             --build-name="${{ steps.version_info.outputs.version_name }}" \
             --build-number=${{ steps.version_info.outputs.build_number }}
 
-      - name: Build Universal APK
-        run: |
-          flutter build apk --release \
-            --build-name="${{ steps.version_info.outputs.version_name }}" \
-            --build-number=${{ steps.version_info.outputs.build_number }}
-
-      - name: Upload APKs to GitHub Release
+      - name: Upload Split APKs to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version_info.outputs.tag }}
           name: "Uniro ${{ steps.version_info.outputs.tag }}"
           files: |
-            build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
