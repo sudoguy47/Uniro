@@ -145,7 +145,10 @@ class DeviceChannel {
   /// the designed feel).
   static Future<bool?> supportsSelectionTick() async {
     try {
-      return await _channel.invokeMethod<bool>('supportsSelectionTick');
+      final res = await _channel.invokeMethod('supportsSelectionTick');
+      if (res is bool) return res;
+      if (res is num) return res == 1;
+      return null;
     } catch (e) {
       debugPrint('device selectionTick notice: $e');
       return null;

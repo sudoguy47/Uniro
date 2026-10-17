@@ -607,6 +607,7 @@ class _HelpCard extends StatefulWidget {
 
 class _HelpCardState extends State<_HelpCard> {
   bool _busy = false;
+  bool _copied = false;
 
   Future<void> _copyDiagnostics() async {
     if (_busy) return;
@@ -638,6 +639,12 @@ class _HelpCardState extends State<_HelpCard> {
         return;
       }
       if (!mounted) return;
+      PremiumHaptics.confirm();
+      setState(() => _copied = true);
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _copied = false);
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Diagnostics copied! Opening Telegram…'),
@@ -672,36 +679,66 @@ class _HelpCardState extends State<_HelpCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Help',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.bold,
-              color: c.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Something broken? Copy diagnostics and send them to support.',
-            style: TextStyle(fontSize: 13, color: c.textSecondary),
-          ),
-          const SizedBox(height: 12),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _busy ? null : _copyDiagnostics,
-                  child: Text(_busy ? 'Copying…' : 'Copy diagnostics'),
+              Text(
+                'Help & Diagnostics',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: c.textPrimary,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextButton(
-                  onPressed: _clearLogs,
-                  child: const Text('Clear logs'),
+              TextButton(
+                onPressed: _clearLogs,
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Clear logs',
+                  style: TextStyle(fontSize: 12, color: c.textSecondary),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Something broken? Copy diagnostics and send them to developer support.',
+            style: TextStyle(
+                fontSize: 13, color: c.textSecondary, height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _busy ? null : _copyDiagnostics,
+              icon: Icon(
+                _copied ? Icons.check_circle_rounded : Icons.copy_rounded,
+                size: 18,
+              ),
+              label: Text(
+                _copied
+                    ? 'Copied to clipboard!'
+                    : _busy
+                        ? 'Building diagnostics…'
+                        : 'Copy Diagnostics & Open Telegram',
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    _copied ? const Color(0xFF2E7D32) : c.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 14),
           Divider(height: 1, color: c.border),

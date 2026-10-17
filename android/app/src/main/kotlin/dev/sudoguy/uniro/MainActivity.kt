@@ -196,14 +196,15 @@ class MainActivity : FlutterActivity() {
                         // keep the designed feel. Fail-open (true) so
                         // unknown means unchanged.
                         try {
-                            if (Build.VERSION.SDK_INT >= 29) {
+                            if (Build.VERSION.SDK_INT >= 30) {
                                 @Suppress("DEPRECATION")
                                 val vib = getSystemService(
                                     Context.VIBRATOR_SERVICE
                                 ) as android.os.Vibrator
-                                result.success(vib.areAllEffectsSupported(
+                                val status = vib.areAllEffectsSupported(
                                     android.os.VibrationEffect.EFFECT_TICK
-                                ))
+                                )
+                                result.success(status == android.os.Vibrator.VIBRATION_EFFECT_SUPPORT_YES)
                             } else {
                                 result.success(true)
                             }

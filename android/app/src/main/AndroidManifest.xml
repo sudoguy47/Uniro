@@ -122,11 +122,21 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- url_launcher: let the OS resolve browsers for https links
-             (update APK download) on Android 11+. -->
+        <!-- url_launcher: let the OS resolve browsers for web and deep links on Android 11+. -->
         <intent>
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="tg"/>
+        </intent>
+        <package android:name="org.telegram.messenger"/>
+        <package android:name="org.telegram.plus"/>
+        <package android:name="org.thunderdog.challegram"/>
     </queries>
 </manifest>
