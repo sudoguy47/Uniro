@@ -1,0 +1,100 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g. v1.0.4)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Prepare Signing Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::KEYSTORE_BASE64 secret is not configured in GitHub Repository Secrets!"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/uniro-release.jks
+          cat <<EOF > android/key.properties
+          storeFile=../uniro-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Compute Version Name and Version Code
+        id: version_info
+        run: |
+          RAW_TAG="${{ github.event.inputs.tag_name }}"
+          if [ -z "$RAW_TAG" ]; then
+            RAW_TAG="${GITHUB_REF_NAME}"
+          fi
+          VERSION_NAME=$(echo "$RAW_TAG" | sed -e 's/^[vV]//')
+          # Build number increments with each run, guaranteed > 2006
+          BUILD_NUMBER=$((2006 + GITHUB_RUN_NUMBER))
+          
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "tag=$RAW_TAG" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION_NAME+$BUILD_NUMBER (tag: $RAW_TAG)"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Split APKs
+        run: |
+          flutter build apk --release --split-per-abi \
+            --build-name="${{ steps.version_info.outputs.version_name }}" \
+            --build-number=${{ steps.version_info.outputs.build_number }}
+
+      - name: Build Universal APK
+        run: |
+          flutter build apk --release \
+            --build-name="${{ steps.version_info.outputs.version_name }}" \
+            --build-number=${{ steps.version_info.outputs.build_number }}
+
+      - name: Upload APKs to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version_info.outputs.tag }}
+          name: "Uniro ${{ steps.version_info.outputs.tag }}"
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
