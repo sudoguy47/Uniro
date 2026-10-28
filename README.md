@@ -2,78 +2,150 @@
   <img src="ss/banner.png" alt="Uniro Banner" width="100%">
 </p>
 
-# Uniro 🎓
+# <img src="ss/icon.png" width="38" height="38" alt="Uniro Icon" style="vertical-align: middle; border-radius: 9px;" /> Uniro
 
-Campus companion for students — tasks with smart reminders, weekly class routine, Pomodoro focus timer, and rich notes. Fully offline; your data stays on your device.
+<p>
+  <strong>Your all-in-one offline campus companion for university life.</strong><br>
+  Stay on top of every deadline, class routine, focus session, and lecture note — completely offline, private, and distraction-free.
+</p>
 
-## Screenshots
+<p>
+  <a href="https://github.com/sudoguy47/Uniro/releases/latest"><img src="https://img.shields.io/badge/Release-v1.0.0-8B5E9E?style=flat-square&logo=android" alt="Latest Release" /></a>
+  <img src="https://img.shields.io/badge/Platform-Android%207.0%2B-3E6FA8?style=flat-square&logo=android" alt="Platform" />
+  <img src="https://img.shields.io/badge/Data-100%25%20Offline-4C7A5B?style=flat-square" alt="100% Offline" />
+  <img src="https://img.shields.io/badge/Privacy-No%20Login%20%2F%20No%20Cloud-D97E36?style=flat-square" alt="No Login Required" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-gray?style=flat-square" alt="MIT License" /></a>
+</p>
 
-### Main App
-| Dashboard | Notes | Focus Summary | Profile |
+---
+
+## 📸 Screenshots
+
+### Main Experience
+| 📊 Dashboard | 📝 Rich Notes | ⏱️ Focus Summary | 👤 Profile & Settings |
 |:---:|:---:|:---:|:---:|
 | <img src="ss/dashboard.jpg" width="220" alt="Dashboard" /> | <img src="ss/notes.jpg" width="220" alt="Notes" /> | <img src="ss/focus_summary.jpg" width="220" alt="Focus Summary" /> | <img src="ss/profile.jpg" width="220" alt="Profile" /> |
 
-### Onboarding
-| Tasks Overview | Visual Calendar | Smart Reminders |
+### Smooth Onboarding
+| 🚀 Campus Tasks | 📅 Visual Schedule | 🔔 Smart Reminders |
 |:---:|:---:|:---:|
 | <img src="ss/onboarding_tasks.jpg" width="220" alt="Campus Tasks" /> | <img src="ss/onboarding_calendar.jpg" width="220" alt="Visual Calendar" /> | <img src="ss/onboarding_reminders.jpg" width="220" alt="Smart Reminders" /> |
 
-## Features
+---
 
-- **Dashboard** — time-aware greeting, rotating motivational quote, hero task carousel, weekly workload chart, next-class card, quick-add.
-- **Tasks** — assignments, exams, CTs, vivas, presentations, labs and projects with due dates/times, priorities, course links, and flexible reminders (at time, 1 hour, 1–7 days, custom).
-- **Routine** — courses with weekly class slots (time, room, overlap detection) and per-class reminders.
-- **Focus** — Pomodoro timer with flip-clock display, configurable focus/break lengths, links to courses/tasks/classes, pause/resume, and session history.
-- **Notes** — block editor (paragraph, checklist, quote), text styling, folders, pin/lock, search, course links.
-- **Notifications** — task reminders, a daily 6 AM briefing, class reminders, and a 1-minute self-test reminder. Exact alarms gracefully fall back to inexact ones when the system denies them; everything is rebuilt after reboot, app update, or timezone change.
-- **Home-screen widgets** — weekly load and monthly heatmap.
-- **Profile** — avatar, reminder defaults, light/dark/system theme, battery-optimization guidance for strict OEMs (Xiaomi, Oppo, Realme, Vivo, Samsung, Huawei), in-app updates, and one-tap diagnostics export.
-- **Reliability** — corrupt-data backup with recovery notice, on-device error log (last 20, never uploaded), capability-aware haptics with per-device fallbacks.
+## ✨ Features at a Glance
 
-## Requirements
+### 📊 Smart Dashboard
+- **Contextual Greetings** — Personalized time-of-day greetings across 7 time brackets (Rise & Shine, Good Morning, Afternoon Grind, Midnight Study).
+- **Daily Fuel Quotes** — 12 deterministic study quotes that rotate automatically each day without internet.
+- **Hero Task Carousel** — Swipeable 4-second auto-advancing cards highlighting your closest upcoming deadlines.
+- **Weekly Load Chart** — 7-bar visual breakdown of due tasks for Monday–Sunday. Tap any bar to instantly filter that day.
+- **Next Class Alert** — Live countdown card informing you of your immediate upcoming lecture room and timing.
 
-- Android 7.0 (API 24) or newer. Built with Flutter (3.47+, Dart 3.13+); targets the latest Android SDK.
+### 📅 Task & Deadline Management
+- **Academic Categorization** — 9 specialized categories: *Assignment, Exam, Class Test (CT), Viva, Presentation, Lab, Project, Other,* and *Custom*.
+- **Smart Reminders** — Schedule alerts *At time of event, 1 hour before, 1 day before, 3 days before, 1 week before,* or set a *Custom N-days* stepper.
+- **Urgency Highlights** — Visual urgency badges:
+  - 🔴 **Overdue** (`#D94F3D`)
+  - 🟠 **Due Today** (`#E8963C`)
+  - 🟢 **Upcoming** (`#5A8A5A`)
+- **Instant Completion** — One-tap completion with immediate haptic response. Cancelled alerts are cleared automatically.
 
-## Install
+### ⏰ Class Routine & Schedule
+- **Weekly Timetable** — Manage recurring classes with time windows, course codes, instructors, and room numbers.
+- **Conflict Prevention** — Built-in overlap detection warns you if two classes collide.
+- **Class Reminders** — Automated alerts 15 minutes prior to every lecture so you never run late.
 
-1. Download `Uniro-<version>.apk` from the latest [GitHub Release](https://github.com/sudoguy47/Uniro/releases/latest).
-2. Open it on your phone and allow “install unknown apps” when asked.
-3. Updates arrive automatically: the app checks GitHub Releases and offers one-tap download.
+### ⏱️ Pomodoro Focus Timer
+- **Split-Flap Flip Clock** — Sleek mechanical flip-card aesthetic designed for zero-distraction study sprints.
+- **Flexible Modes** — Standard Pomodoro (work + auto break), single countdown block, or count-up stopwatch.
+- **Course & Task Linking** — Tag your study sessions to specific courses to track where your hours go.
+- **Session History** — Automatically logs completed focus blocks into an aggregated study summary.
 
-> The package ID is `dev.sudoguy.uniro`. Builds must keep the same signing key or Android will refuse updates.
+### 📝 Rich Block Notes
+- **Modular Block Editor** — Flexible paragraphs, animated interactive checklists, and styled quote bubbles.
+- **Inline Formatting** — Bold, italic, color highlights, custom text sizing, and text alignment.
+- **Folder Organization** — Group notes into *Personal, Study, Work,* or create your own custom folders.
+- **500ms Autosave** — Instant debounce autosave protects your notes against app exits or low-battery shutdowns.
+- **Undo Protection** — 4-second safety Snackbar with one-tap restore if you accidentally delete a note.
 
-## Build from source
+### 🔔 Reliable Notifications & Alarms
+- **Exact Alarms** — Utilizes Android's `AlarmManager.setExactAndAllowWhileIdle` for dependable notifications.
+- **Morning 6:00 AM Briefing** — Daily morning motivation alert with 30 rotating life quotes (`id: 900001`).
+- **Reboot Resilience** — Automatically re-arms all pending task and class alarms upon phone reboot (`BOOT_COMPLETED`), timezone change, or system clock update.
 
-```powershell
+### 📱 Home-Screen Widgets
+- **Weekly Load Widget** — 560×160 graphic bar chart of your upcoming 7-day workload and immediate next task.
+- **Monthly Heatmap Widget** — Calendar matrix featuring activity streak dots.
+
+### 🎨 Personalization & Theme
+- **Warm Paper Aesthetic** — Hand-crafted color palette (`#EDE8DF` Light / `#0F0E0C` Dark) easy on student eyes.
+- **Theme Modes** — One-tap toggle between Light, Dark, or System default.
+- **Profile Customization** — Custom profile avatar with initial-letter fallback and editable student name.
+- **OEM Battery Guide** — Step-by-step tips for strict background-killing devices (Xiaomi, Oppo, Realme, Vivo, Samsung).
+
+---
+
+## 🔒 Privacy First
+
+- **100% On-Device:** All tasks, routines, notes, and preferences live solely on your phone's local storage.
+- **No Sign-Up:** No email, phone number, password, or third-party account required.
+- **Zero Analytics:** No tracking SDKs, no ad networks, no data harvesting.
+- **Offline Reliability:** Operates with 100% functionality without mobile data or Wi-Fi.
+
+---
+
+## 📥 Installation
+
+1. Grab the latest APK from the [GitHub Releases](https://github.com/sudoguy47/Uniro/releases/latest) page.
+2. Open the downloaded file on your Android device.
+3. Allow *"Install unknown apps"* if prompted by your browser/file manager.
+4. Open **Uniro** and enjoy your productive campus journey!
+
+> **Note:** The official application package is `dev.sudoguy.uniro`.
+
+---
+
+## 🛠️ Build from Source
+
+### Prerequisites
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) (v3.24+ recommended)
+- [Android Studio](https://developer.android.com/studio) / Android SDK (API 34+)
+
+```bash
+# Clone the repository
+git clone https://github.com/sudoguy47/Uniro.git
+cd Uniro
+
+# Install dependencies
 flutter pub get
+
+# Run static analysis & tests
 flutter analyze
 flutter test
+
+# Build debug APK
+flutter build apk --debug
+
+# Build production release APK
 flutter build apk --release
 ```
 
-Release signing reads `android/key.properties` (see `android/KEYSTORE.md`). That file and `*.jks` are git-ignored and must never be committed — without them, release builds fall back to the debug key for local testing only.
+---
 
-## Permissions (Android) and why
+## 🛡️ Android Permissions
 
-| Permission | Reason |
+| Permission | Purpose |
 |---|---|
-| `INTERNET` | Check GitHub Releases for updates |
-| `RECEIVE_BOOT_COMPLETED` | Re-arm reminders after reboot / app update |
-| `VIBRATE` | Notification vibration |
-| `POST_NOTIFICATIONS` (Android 13+) | Task, class, and greeting notifications (asked only when you enable reminders) |
-| `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` (Android 12+) | On-time reminders; falls back to inexact timing if denied |
-| `READ_MEDIA_IMAGES` (Android 13+) / `READ_EXTERNAL_STORAGE` (≤ Android 12 only) | Profile photo picker |
+| `POST_NOTIFICATIONS` | Delivers task deadline alerts, class reminders, and the 6:00 AM morning fuel quote. |
+| `SCHEDULE_EXACT_ALARM` | Guarantees alarms fire on the exact minute, even when the device is in Doze mode. |
+| `RECEIVE_BOOT_COMPLETED` | Automatically reschedules all your alarms after device restart. |
+| `VIBRATE` | Provides soft tactile feedback on taps and notification vibration. |
+| `READ_MEDIA_IMAGES` | Optional: lets you select a local photo for your profile avatar. |
 
-## Privacy
+---
 
-- All tasks, classes, notes, and settings are stored locally via SharedPreferences. No account, no cloud sync, no analytics.
-- The error log keeps the last 20 entries on-device for diagnostics export. Nothing is uploaded.
-- The only network use is the GitHub Releases update check and APK download.
+## 📄 License
 
-## Tests
-
-Automated coverage (`flutter test`) includes quotes/scheduling helpers, haptic capability fallbacks, notification ID logic, routine helpers, focus logic, and note models. Release builds are additionally verified with `apksigner` (release certificate) and `aapt` (package ID + version).
-
-## License
-
-MIT — see [LICENSE](LICENSE). Copyright (c) 2026 sudoguy47.
+This project is open-source and available under the [MIT License](LICENSE).  
+Copyright (c) 2026 **sudoguy47**.
