@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Optional subtle background container; remove <rect> for transparent background -->
+  <rect width="512" height="512" rx="115" fill="#142A3B" />
+
+  <!-- Base U Curve (Midnight Navy on light canvas, or Cloud White/Mint on dark canvas) -->
+  <!-- Concept 02: Anchored foundational curve with dynamic diagonal break -->
+  <path d="M 120 220 
+       C 120 330, 180 392, 270 392 
+       C 330 392, 380 365, 410 320 
+       L 362 284 
+       C 340 314, 308 332, 270 332 
+       C 216 332, 178 290, 178 220 
+       L 178 180 
+       L 120 180 
+       Z" fill="#F4F7F8" />
+
+  <!-- Upward Momentum Wedge / Rising Terminal (Mint) -->
+  <path d="M 330 290 
+       L 390 120 
+       L 430 190 
+       L 374 340 
+       Z" fill="#55D6BE" />
+  <polygon points="390,100 460,200 340,165" fill="#55D6BE" />
+</svg>
