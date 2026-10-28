@@ -54,3 +54,14 @@ public/fonts/imported/*
 !public/fonts/imported/.gitkeep
 .e2e/
 
+
+# Prevent auto-test screenshots from ever being tracked in git
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+!android/app/src/main/res/**
+!ios/Runner/Assets.xcassets/**
+!web/**
+!ss/**

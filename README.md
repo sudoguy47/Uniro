@@ -1,6 +1,22 @@
+<p align="center">
+  <img src="ss/banner.png" alt="Uniro Banner" width="100%">
+</p>
+
 # Uniro 🎓
 
 Campus companion for students — tasks with smart reminders, weekly class routine, Pomodoro focus timer, and rich notes. Fully offline; your data stays on your device.
+
+## Screenshots
+
+### Main App
+| Dashboard | Notes | Focus Summary | Profile |
+|:---:|:---:|:---:|:---:|
+| <img src="ss/dashboard.jpg" width="220" alt="Dashboard" /> | <img src="ss/notes.jpg" width="220" alt="Notes" /> | <img src="ss/focus_summary.jpg" width="220" alt="Focus Summary" /> | <img src="ss/profile.jpg" width="220" alt="Profile" /> |
+
+### Onboarding
+| Tasks Overview | Visual Calendar | Smart Reminders |
+|:---:|:---:|:---:|
+| <img src="ss/onboarding_tasks.jpg" width="220" alt="Campus Tasks" /> | <img src="ss/onboarding_calendar.jpg" width="220" alt="Visual Calendar" /> | <img src="ss/onboarding_reminders.jpg" width="220" alt="Smart Reminders" /> |
 
 ## Features
 
@@ -20,7 +36,7 @@ Campus companion for students — tasks with smart reminders, weekly class routi
 
 ## Install
 
-1. Download `Uniro-<version>.apk` from the latest [GitHub Release](../../releases/latest).
+1. Download `Uniro-<version>.apk` from the latest [GitHub Release](https://github.com/sudoguy47/Uniro/releases/latest).
 2. Open it on your phone and allow “install unknown apps” when asked.
 3. Updates arrive automatically: the app checks GitHub Releases and offers one-tap download.
 
