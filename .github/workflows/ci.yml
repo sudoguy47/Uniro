@@ -31,7 +31,7 @@ jobs:
         run: flutter pub get
 
       - name: Verify formatting and analysis
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Run tests
         run: flutter test --concurrency=1

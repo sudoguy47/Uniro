@@ -63,12 +63,8 @@ jobs:
             echo "::error::android/uniro-release.jks is empty or decoding failed!"
             exit 1
           fi
-          cat <<EOF > android/key.properties
-storeFile=../uniro-release.jks
-storePassword=$KEYSTORE_PASSWORD
-keyAlias=$KEY_ALIAS
-keyPassword=$KEY_PASSWORD
-EOF
+          printf "storeFile=../uniro-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n" \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/key.properties
 
       - name: Compute Version Name and Version Code
         id: version_info
