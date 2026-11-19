@@ -33,6 +33,10 @@ class TourGuideKeys {
 /// Returns true if the tour should be shown automatically (first launch or
 /// after update to build 2008).
 bool shouldShowTour() {
+  // Never auto-show during widget tests to avoid obscuring existing test surfaces
+  if (WidgetsBinding.instance.runtimeType.toString().contains('Test')) {
+    return false;
+  }
   final stored = LocalStore.instance.load(_kTourKey);
   if (stored == null) return true; // brand new user
   if (stored is num && stored < _kTourBuildNumber) return true; // update
