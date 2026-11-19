@@ -8,6 +8,7 @@ import '../../../state/routine_state.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_notification.dart';
 import '../../../widgets/update_dialog.dart';
+import '../../../features/onboarding/tour_guide.dart';
 import 'support_sheet.dart';
 
 /// Grouped About card: Courses management, Check for updates, and Developer Support.
@@ -218,6 +219,54 @@ class _AboutCardState extends State<AboutCard> {
                     Icons.chevron_right_rounded,
                     size: 20,
                     color: c.textTertiary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Divider(height: 1, indent: 14, endIndent: 14, color: c.borderLight),
+
+          // App Guide Row
+          InkWell(
+            onTap: () {
+              PremiumHaptics.tap();
+              showTourGuide(context);
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'App Guide',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w600,
+                            color: c.textPrimary,
+                            letterSpacing: -0.1,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          'Take a tour of Uniro\'s features',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: c.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.play_circle_outline_rounded,
+                    size: 20,
+                    color: c.accent,
                   ),
                 ],
               ),

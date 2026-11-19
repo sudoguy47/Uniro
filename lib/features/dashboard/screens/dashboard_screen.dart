@@ -23,6 +23,7 @@ import '../widgets/hero_section.dart';
 import '../widgets/task_list_section.dart';
 import '../widgets/view_toggle.dart';
 import '../widgets/weekly_load_section.dart';
+import '../../../features/onboarding/tour_guide.dart';
 
 /// Highly optimized Dashboard Screen.
 ///
@@ -51,7 +52,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ValueNotifier isolates sheet open/close animations.
   // Completely prevents rebuilding headers, carousels, charts, or task lists.
   final ValueNotifier<bool> _showNewTaskNotifier = ValueNotifier<bool>(false);
-  final GlobalKey _plusKey = GlobalKey();
+  // Use TourGuideKeys.plusButton so the tour guide can spotlight the + button.
+  final GlobalKey _plusKey = TourGuideKeys.plusButton;
   OverlayEntry? _plusOverlay;
   bool _plusOpen = false;
   bool _completedSeen = false;

@@ -17,6 +17,7 @@ import '../screens/focus_screen.dart';
 import '../screens/notes/notes_screen.dart';
 import '../screens/profile_screen.dart';
 import '../state/attendance_state.dart';
+import '../features/onboarding/tour_guide.dart';
 
 /// Named tab identifiers (no magic indexes). There is no persisted tab
 /// anywhere in the app (route lives in memory only), so no old-index
@@ -49,6 +50,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _tab = widget.initialTab;
     _pageController = PageController(initialPage: _tab.index);
+    // Show tour guide for new users or on first launch after v1.0.5 update.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && shouldShowTour()) {
+        showTourGuide(context);
+      }
+    });
   }
 
   @override
@@ -248,6 +255,7 @@ class _BottomNavBar extends StatelessWidget {
                 label: _label(tab),
                 selected: isActive,
                 child: _NavItem(
+                  key: _tourKey(tab),
                   active: isActive,
                   icon: Icon(
                     isActive ? _fillIcon(tab) : _outlineIcon(tab),
@@ -284,6 +292,14 @@ class _BottomNavBar extends StatelessWidget {
     );
   }
 
+  GlobalKey? _tourKey(AppTab t) => switch (t) {
+        AppTab.dashboard => TourGuideKeys.navDashboard,
+        AppTab.routine => TourGuideKeys.navRoutine,
+        AppTab.focus => TourGuideKeys.navFocus,
+        AppTab.notes => TourGuideKeys.navNotes,
+        AppTab.profile => TourGuideKeys.navProfile,
+      };
+
   IconData _fillIcon(AppTab t) => switch (t) {
         AppTab.dashboard => Icons.grid_view_rounded,
         AppTab.routine => Icons.school_rounded,
@@ -310,7 +326,9 @@ class _BottomNavBar extends StatelessWidget {
 }
 
 /// One nav item: icon scale-pops on activation, label fades in.
-class _NavItem extends StatefulWidget {  const _NavItem({
+class _NavItem extends StatefulWidget {
+  const _NavItem({
+    super.key,
     required this.active,
     required this.icon,
     required this.label,
