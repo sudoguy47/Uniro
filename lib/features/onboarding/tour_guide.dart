@@ -339,59 +339,69 @@ class _TourGuideOverlayState extends State<_TourGuideOverlay>
     final size = MediaQuery.sizeOf(context);
     final c = Theme.of(context).extension<AppColors>()!;
 
-    return FadeTransition(
-      opacity: _fade,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // ── Dark overlay with clean spotlight cutout (NO harsh yellow border) ──
-          AnimatedBuilder(
-            animation: _spotCtrl,
-            builder: (_, __) {
-              final animRect =
-                  _spotCtrl.isAnimating ? _spotAnim.value : _spotRect;
-              return CustomPaint(
-                size: size,
-                painter: _OverlayPainter(spotRect: animRect),
-              );
-            },
-          ),
+    return Material(
+      type: MaterialType.transparency,
+      child: DefaultTextStyle(
+        style: TextStyle(
+          decoration: TextDecoration.none,
+          fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily,
+          color: c.textPrimary,
+        ),
+        child: FadeTransition(
+          opacity: _fade,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // ── Dark overlay with clean spotlight cutout (NO harsh yellow border) ──
+              AnimatedBuilder(
+                animation: _spotCtrl,
+                builder: (_, __) {
+                  final animRect =
+                      _spotCtrl.isAnimating ? _spotAnim.value : _spotRect;
+                  return CustomPaint(
+                    size: size,
+                    painter: _OverlayPainter(spotRect: animRect),
+                  );
+                },
+              ),
 
-          // ── Content ──────────────────────────────────────────────────────────
-          if (step.layout == _StepLayout.fullCard)
-            _FullCardStep(
-              step: step,
-              stepIndex: _step,
-              totalSteps: _tourSteps.length,
-              onNext: _next,
-              onBack: _step > 0 ? _back : null,
-              onSkip: _skip,
-              isLast: _step == _tourSteps.length - 1,
-              c: c,
-            )
-          else if (step.layout == _StepLayout.interactiveDemo)
-            _InteractiveDemoStep(
-              stepIndex: _step,
-              totalSteps: _tourSteps.length,
-              onNext: _next,
-              onBack: _back,
-              onSkip: _skip,
-              onSeedExamples: widget.onSeedExamples,
-              c: c,
-            )
-          else
-            _SpotlightStep(
-              step: step,
-              stepIndex: _step,
-              totalSteps: _tourSteps.length,
-              spotRect: _spotRect,
-              onNext: _next,
-              onBack: _step > 0 ? _back : null,
-              onSkip: _skip,
-              isLast: _step == _tourSteps.length - 1,
-              c: c,
-            ),
-        ],
+              // ── Content ──────────────────────────────────────────────────────────
+              if (step.layout == _StepLayout.fullCard)
+                _FullCardStep(
+                  step: step,
+                  stepIndex: _step,
+                  totalSteps: _tourSteps.length,
+                  onNext: _next,
+                  onBack: _step > 0 ? _back : null,
+                  onSkip: _skip,
+                  isLast: _step == _tourSteps.length - 1,
+                  c: c,
+                )
+              else if (step.layout == _StepLayout.interactiveDemo)
+                _InteractiveDemoStep(
+                  stepIndex: _step,
+                  totalSteps: _tourSteps.length,
+                  onNext: _next,
+                  onBack: _back,
+                  onSkip: _skip,
+                  onSeedExamples: widget.onSeedExamples,
+                  c: c,
+                )
+              else
+                _SpotlightStep(
+                  step: step,
+                  stepIndex: _step,
+                  totalSteps: _tourSteps.length,
+                  spotRect: _spotRect,
+                  onNext: _next,
+                  onBack: _step > 0 ? _back : null,
+                  onSkip: _skip,
+                  isLast: _step == _tourSteps.length - 1,
+                  c: c,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
