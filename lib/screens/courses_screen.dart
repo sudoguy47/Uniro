@@ -1,12 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../domain/haptics.dart';
 import 'package:provider/provider.dart';
 import '../models/course.dart';
+import '../models/class_slot.dart';
 import '../services/notification_service.dart';
 import '../state/app_state.dart';
+import '../state/attendance_state.dart';
+import '../state/focus_state.dart';
 import '../state/notes_state.dart';
 import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
+import '../models/task.dart';
+import '../widgets/app_notification.dart';
 
 /// Profile > Courses: list, add, edit, delete.
 ///
@@ -15,13 +21,19 @@ import '../theme/app_colors.dart';
 class CoursesScreen extends StatelessWidget {
   const CoursesScreen({super.key});
 
-  Future<void> _refresh(BuildContext context) {
-    final routine = context.read<RoutineState>();
-    final enabled =
-        context.read<AppState>().settings.notificationsEnabled;
-    return NotificationService.instance.refreshClassReminders(
-      courses: routine.courses,
-      slots: routine.slots,
+  Future<void> _refresh({
+    required List<Course> courses,
+    required List<ClassSlot> slots,
+    required bool enabled,
+  }) async {
+    await NotificationService.instance.refreshClassReminders(
+      courses: courses,
+      slots: slots,
+      enabled: enabled,
+    );
+    return NotificationService.instance.refreshAttendancePrompts(
+      courses: courses,
+      slots: slots,
       enabled: enabled,
     );
   }
@@ -46,31 +58,99 @@ class CoursesScreen extends StatelessWidget {
   void _confirmDelete(BuildContext context, Course course) {
     final c = Theme.of(context).extension<AppColors>()!;
     final routine = context.read<RoutineState>();
+    final attendance = context.read<AttendanceState>();
+    final app = context.read<AppState>();
+    final notes = context.read<NotesState>();
+    final focus = context.read<FocusState>();
+
     final classCount =
         routine.slots.where((s) => s.courseId == course.id).length;
+    final attendanceCount =
+        attendance.records.where((r) => r.courseId == course.id).length;
+    final taskCount =
+        app.tasks.where((t) => t.courseId == course.id).length;
+    final noteCount =
+        notes.allNotes.where((n) => n.courseId == course.id).length;
+    final focusCount = focus.sessions
+        .where((s) => s.linkKind == 'course' && s.linkId == course.id)
+        .length;
+
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: c.cardBg,
         title: Text('Delete "${course.name}"?'),
-        content: Text(
-          'Its $classCount class${classCount == 1 ? '' : 'es'} and reminders will be deleted. Linked tasks and notes stay, but will be unlinked.',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will permanently delete:',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '• $classCount routine class slot${classCount == 1 ? '' : 's'} & scheduled reminders\n'
+              '• $attendanceCount attendance log${attendanceCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                fontSize: 13,
+                color: c.textSecondary,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Will be preserved (detached from course):',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: c.textPrimary,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '• $taskCount task${taskCount == 1 ? '' : 's'}\n'
+              '• $noteCount note${noteCount == 1 ? '' : 's'}\n'
+              '• $focusCount focus study session${focusCount == 1 ? '' : 's'}',
+              style: TextStyle(
+                fontSize: 13,
+                color: c.textSecondary,
+                height: 1.35,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              routine.deleteCourse(course.id);
-              context.read<AppState>().unlinkCourse(course.id);
-              context.read<NotesState>().unlinkCourse(course.id);
-              _refresh(context);
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                    const SnackBar(content: Text('Course deleted')));
+              final removedSlots = routine.deleteCourse(course.id);
+              for (final slot in removedSlots) {
+                unawaited(NotificationService.instance
+                    .cancelClassRemindersForSlot(slot.id));
+                unawaited(NotificationService.instance
+                    .cancelAttendancePromptsForSlot(slot.id));
+              }
+              await attendance.clearForCourse(course.id);
+              app.unlinkCourse(course.id);
+              notes.unlinkCourse(course.id);
+              focus.unlinkCourse(course.id);
+              await _refresh(
+                courses: routine.courses,
+                slots: routine.slots,
+                enabled: app.settings.notificationsEnabled,
+              );
+              if (context.mounted) {
+                AppNotification.info(context, 'Course and schedule deleted');
+              }
             },
             child: Text('Delete', style: TextStyle(color: c.overdue)),
           ),
@@ -83,6 +163,10 @@ class CoursesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
     final routine = context.watch<RoutineState>();
+    final app = context.watch<AppState>();
+    final tasks = app.tasks;
+
+    final totalWeeklyClasses = routine.slots.length;
 
     return Scaffold(
       backgroundColor: c.pageBg,
@@ -97,11 +181,15 @@ class CoursesScreen extends StatelessWidget {
         title: Text(
           'Courses',
           style: TextStyle(
-              color: c.textPrimary, fontWeight: FontWeight.w800),
+            color: c.textPrimary,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.add_rounded, color: c.accent),
+            icon: Icon(Icons.add_rounded, color: c.accent, size: 26),
             onPressed: () {
               PremiumHaptics.tap();
               _openEditor(context);
@@ -110,93 +198,324 @@ class CoursesScreen extends StatelessWidget {
         ],
       ),
       body: routine.courses.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.school_outlined,
-                      size: 44, color: c.textTertiary),
-                  const SizedBox(height: 10),
-                  Text(
-                    'No courses yet',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: c.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Add one to start building your routine.',
-                    style:
-                        TextStyle(fontSize: 13, color: c.textSecondary),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              itemCount: routine.courses.length,
-              itemBuilder: (context, i) {
-                final course = routine.courses[i];
-                final n = routine.slots
-                    .where((s) => s.courseId == course.id)
-                    .length;
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: c.cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: c.border),
-                  ),
-                  child: ListTile(
-                    leading: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: course.colorTag != null
-                            ? Color(course.colorTag!)
-                            : c.border,
-                        shape: BoxShape.circle,
+          ? _EmptyCourses(onAdd: () => _openEditor(context))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                  child: Row(
+                    children: [
+                      Text(
+                        '${routine.courses.length} course${routine.courses.length == 1 ? '' : 's'} · $totalWeeklyClasses class${totalWeeklyClasses == 1 ? '' : 'es'} per week',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: c.textTertiary,
+                          letterSpacing: 0.2,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                    itemCount: routine.courses.length,
+                    itemBuilder: (context, i) {
+                      final course = routine.courses[i];
+                      final n = routine.slots
+                          .where((s) => s.courseId == course.id)
+                          .length;
+                      final courseTasks = tasks
+                          .where((t) => t.courseId == course.id)
+                          .toList();
+                      final completedCount = courseTasks
+                          .where((t) => t.status == TaskStatus.completed)
+                          .length;
+
+                      return _CourseCard(
+                        course: course,
+                        classCount: n,
+                        taskCount: courseTasks.length,
+                        completedTaskCount: completedCount,
+                        onEdit: () {
+                          PremiumHaptics.select();
+                          _openEditor(context, existing: course);
+                        },
+                        onDelete: () {
+                          PremiumHaptics.tap();
+                          _confirmDelete(context, course);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _EmptyCourses extends StatelessWidget {
+  const _EmptyCourses({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: c.inputBg,
+              ),
+              alignment: Alignment.center,
+              child: Icon(Icons.school_outlined,
+                  size: 28, color: c.textTertiary),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'No courses yet',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: c.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Add your courses once and Uniro builds your routine, reminders and attendance tracking around them.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: c.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            TextButton(
+              onPressed: onAdd,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: c.accent,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 22, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Add your first course',
+                  style:
+                      TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseCard extends StatelessWidget {
+  const _CourseCard({
+    required this.course,
+    required this.classCount,
+    required this.taskCount,
+    required this.completedTaskCount,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Course course;
+  final int classCount;
+  final int taskCount;
+  final int completedTaskCount;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  Color get _courseColor {
+    if (course.colorTag != null) return Color(course.colorTag!);
+    return Color(
+        Course.palette[course.id.hashCode.abs() % Course.palette.length]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final accent = _courseColor;
+    final hasTasks = taskCount > 0;
+    final progress =
+        hasTasks ? (completedTaskCount / taskCount).clamp(0.0, 1.0) : 0.0;
+    final progressPct = (progress * 100).round();
+    final code = (course.code ?? '').trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: c.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onEdit,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
+                children: [
+                  // Identity spine in the course colour
+                  Container(
+                    width: 4,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    title: Text(
-                      (course.code ?? '').isNotEmpty
-                          ? '${course.code} · ${course.name}'
-                          : course.name,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: c.textPrimary),
-                    ),
-                    subtitle: Text(
-                      '$n class${n == 1 ? '' : 'es'} per week',
-                      style: TextStyle(color: c.textSecondary),
-                    ),
-                    trailing: Row(
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Course info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: Icon(Icons.edit_outlined,
-                              size: 20, color: c.textSecondary),
-                          onPressed: () {
-                            PremiumHaptics.select();
-                            _openEditor(context, existing: course);
-                          },
+                        Row(
+                          children: [
+                            if (code.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  code,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: accent,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text(
+                              '$classCount class${classCount == 1 ? '' : 'es'}/wk',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: c.textTertiary,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const Spacer(),
+                          ],
                         ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline,
-                              size: 20, color: c.overdue),
-                          onPressed: () {
-                            PremiumHaptics.tap();
-                            _confirmDelete(context, course);
-                          },
+                        const SizedBox(height: 4),
+                        Text(
+                          course.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: c.textPrimary,
+                            letterSpacing: -0.2,
+                          ),
                         ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasTasks
+                              ? '$completedTaskCount of $taskCount task${taskCount == 1 ? '' : 's'} done'
+                              : 'No tasks assigned yet',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: c.textSecondary,
+                          ),
+                        ),
+                        if (hasTasks) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: Container(
+                                    height: 4,
+                                    color: c.inputBg,
+                                    child: FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: progress,
+                                      child: Container(color: accent),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                '$progressPct%',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: c.textTertiary,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                );
-              },
+
+                  // Quick actions
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: onEdit,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(7),
+                          child: Icon(Icons.edit_outlined,
+                              size: 17, color: c.textTertiary),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: onDelete,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(7),
+                          child: Icon(Icons.delete_outline_rounded,
+                              size: 17,
+                              color: c.overdue.withValues(alpha: 0.75)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -230,8 +549,7 @@ class _CourseEditorState extends State<_CourseEditor> {
   void _save() {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Course name is required.')));
+      AppNotification.warning(context, 'Course name is required.');
       return;
     }
     final routine = context.read<RoutineState>();
@@ -279,8 +597,9 @@ class _CourseEditorState extends State<_CourseEditor> {
             Text(
               widget.existing != null ? 'Edit Course' : 'New Course',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
                 color: c.textPrimary,
               ),
             ),
@@ -322,12 +641,12 @@ class _CourseEditorState extends State<_CourseEditor> {
                   foregroundColor: Colors.white,
                   backgroundColor: c.accent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: const Text('Save Course',
                     style:
-                        TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
           ],

@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../core/logger.dart';
 
 /// Support links for the Profile > Help > "Need a hand?" dialog.
 ///
@@ -35,8 +36,8 @@ Future<bool> openExternalLink(String url) async {
   if (uri.scheme != 'http' && uri.scheme != 'https') return false;
   try {
     return await launchUrl(uri, mode: LaunchMode.externalApplication);
-  } catch (e) {
-    debugPrint('open link notice: $e');
+  } catch (e, st) {
+    AppLog.w('open link notice: $e', e, st);
     return false;
   }
 }

@@ -6,6 +6,7 @@ import '../domain/ids.dart';
 import '../models/focus_session.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
+import '../services/error_log.dart';
 
 /// Course-based Pomodoro engine.
 ///
@@ -91,7 +92,8 @@ class FocusState extends ChangeNotifier {
             } else {
               LocalStore.instance.markRecovery();
             }
-          } catch (_) {
+          } catch (e, st) {
+            ErrorLog.record(e, st, 'load_focus_sessions');
             LocalStore.instance.markRecovery();
             continue;
           }
@@ -201,10 +203,70 @@ class FocusState extends ChangeNotifier {
     });
   }
 
+  /// Re-reads sessions + engine prefs from disk (used after a backup
+  /// import). Only touches the Pomodoro engine when no run is active.
+  /// Never throws.
+  Future<void> reloadFromDisk() async {
+    try {
+      final raw = LocalStore.instance.load(_sessionsKey);
+      if (raw is List) {
+        final parsed = <FocusSession>[];
+        for (final j in raw) {
+          try {
+            if (j is Map) {
+              parsed.add(FocusSession.fromJson(Map<String, dynamic>.from(j)));
+            }
+          } catch (_) {}
+        }
+        parsed.sort((a, b) => b.startedAt.compareTo(a.startedAt));
+        _sessions = parsed;
+      }
+      if (!running && phase == FocusPhase.idle) {
+        _loadEngine();
+      }
+    } catch (_) {}
+    if (!_disposed) notifyListeners();
+  }
+
   void _persistSessions() {
     if (_disposed) return;
     LocalStore.instance.save(
         _sessionsKey, _sessions.map((s) => s.toJson()).toList());
+  }
+
+  /// Unlinks a deleted course from active session and past focus session history.
+  void unlinkCourse(String courseId) {
+    var changed = false;
+    if (linkKind == 'course' && linkId == courseId) {
+      linkKind = 'none';
+      linkId = null;
+      changed = true;
+    }
+    final updated = <FocusSession>[];
+    for (final s in _sessions) {
+      if (s.linkKind == 'course' && s.linkId == courseId) {
+        changed = true;
+        updated.add(FocusSession(
+          id: s.id,
+          runId: s.runId,
+          date: s.date,
+          startedAt: s.startedAt,
+          plannedSec: s.plannedSec,
+          focusedSec: s.focusedSec,
+          linkKind: 'none',
+          linkId: null,
+          linkName: s.linkName,
+          completed: s.completed,
+        ));
+      } else {
+        updated.add(s);
+      }
+    }
+    if (changed) {
+      _sessions = updated;
+      _persistSessions();
+      notifyListeners();
+    }
   }
 
   void _touch() {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/logger.dart';
 import '../services/device_channel.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
@@ -85,7 +86,7 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
         _apk = file;
         _phase = _Phase.verifying;
       });
-      final readiness = await checkInstallReadiness(file);
+      final readiness = await checkInstallReadiness(file, update: _update);
       if (!mounted) return;
       if (!readiness.ok) {
         setState(() {
@@ -134,16 +135,36 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
         Uri.parse(_update.apkUrl),
         mode: LaunchMode.externalApplication,
       );
-    } catch (e) {
-      debugPrint('open apk link notice: $e');
+    } catch (e, st) {
+      AppLog.w('open apk link notice: $e', e, st);
     }
   }
 
   String _mb(int bytes) => (bytes / 1048576).toStringAsFixed(1);
 
+  String _cleanNotes(String raw) {
+    final lines = raw.split('\n');
+    final cleaned = <String>[];
+    for (var line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.startsWith('---') ||
+          trimmed.toLowerCase().startsWith('sha-256') ||
+          trimmed.toLowerCase().startsWith('checksum:')) {
+        continue;
+      }
+      var l = line;
+      if (l.trim().startsWith(RegExp(r'^#+\s*'))) {
+        l = l.trim().replaceFirst(RegExp(r'^#+\s*'), '');
+      }
+      cleaned.add(l);
+    }
+    return cleaned.join('\n').trim();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
+    final noteText = _cleanNotes(_update.notes);
     return AlertDialog(
       backgroundColor: c.cardBg,
       title: const Text('Update available'),
@@ -154,11 +175,27 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
           children: [
             Text('Version ${_update.version} is ready.',
                 style: const TextStyle(fontWeight: FontWeight.w700)),
-            if (_update.notes.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(_update.notes.trim(),
-                  style:
-                      TextStyle(fontSize: 13, color: c.textSecondary)),
+            if (noteText.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: c.cardBgRaised,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: c.borderLight,
+                  ),
+                ),
+                child: Text(
+                  noteText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: c.textSecondary,
+                  ),
+                ),
+              ),
             ],
             const SizedBox(height: 12),
             _buildPhaseBody(c),
@@ -216,13 +253,6 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Later'),
-          ),
-          TextButton(
-            onPressed: () {
-              skipUpdateVersion(_update.tag);
-              Navigator.pop(context);
-            },
-            child: const Text('Skip this version'),
           ),
           FilledButton(
             onPressed: _busy ? null : _downloadAndInstall,
@@ -315,7 +345,7 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
       _error = '';
     });
     try {
-      final readiness = await checkInstallReadiness(file);
+      final readiness = await checkInstallReadiness(file, update: _update);
       if (!mounted) return;
       if (!readiness.ok) {
         setState(() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../domain/haptics.dart';
 import '../services/notification_service.dart';
 import '../services/update_service.dart';
@@ -15,6 +16,8 @@ import '../screens/routine_screen.dart';
 import '../screens/focus_screen.dart';
 import '../screens/notes/notes_screen.dart';
 import '../screens/profile_screen.dart';
+import '../state/attendance_state.dart';
+import '../features/onboarding/tour_guide.dart';
 
 /// Named tab identifiers (no magic indexes). There is no persisted tab
 /// anywhere in the app (route lives in memory only), so no old-index
@@ -47,6 +50,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _tab = widget.initialTab;
     _pageController = PageController(initialPage: _tab.index);
+    // Show tour guide for new users or on first launch after v1.0.5 update.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && shouldShowTour()) {
+        showTourGuide(context);
+      }
+    });
   }
 
   @override
@@ -67,6 +76,11 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       }
     }
     if (state == AppLifecycleState.resumed && mounted) {
+      // The notification background isolate may have recorded attendance
+      // while the app was closed; pull it into RAM.
+      try {
+        context.read<AttendanceState>().refresh();
+      } catch (_) {}
       // Timezone / clock may have changed while away: refresh only when
       // the native flag or zone id says so. Fire-and-forget, never throws.
       try {
@@ -135,43 +149,59 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     return Scaffold(
       backgroundColor: c.pageBg,
-      body: Stack(
-        children: [
-          // ── Scrollable Pages ───────────────────────────────────────────
-          PageView(
-            controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints:
+              const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: Stack(
             children: [
-              DashboardScreen(
-                onNavigateToProfile: () => _navigate(AppTab.profile),
-                onNavigateToRoutine: () => _navigate(AppTab.routine),
+              // ── Scrollable Pages ───────────────────────────────────────────
+              PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  DashboardScreen(
+                    onNavigateToProfile: () => _navigate(AppTab.profile),
+                    onNavigateToRoutine: () => _navigate(AppTab.routine),
+                  ),
+                  RoutineScreen(
+                    attendanceStatus: (slotId, date) {
+                      try {
+                        return context
+                            .read<AttendanceState>()
+                            .statusFor(slotId, date);
+                      } catch (_) {
+                        return null;
+                      }
+                    },
+                  ),
+                  const FocusScreen(),
+                  const NotesScreen(),
+                  const ProfileScreen(),
+                ],
               ),
-              const RoutineScreen(),
-              const FocusScreen(),
-              const NotesScreen(),
-              const ProfileScreen(),
-            ],
-          ),
 
-          // ── Simple Docked Navigation Bar (hidden while focus ticks) ──
-          if (!focusRunning)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: AnimatedSlide(
-                offset: isNewTaskOpen ? const Offset(0, 1.2) : Offset.zero,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeInOut,
-                child: RepaintBoundary(
-                  child: _BottomNavBar(
-                    current: _tab,
-                    onTap: _navigate,
+              // ── Simple Docked Navigation Bar (hidden while focus ticks) ──
+              if (!focusRunning)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: AnimatedSlide(
+                    offset: isNewTaskOpen ? const Offset(0, 1.2) : Offset.zero,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: RepaintBoundary(
+                      child: _BottomNavBar(
+                        current: _tab,
+                        onTap: _navigate,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -186,12 +216,12 @@ class _BottomNavBar extends StatelessWidget {
   final AppTab current;
   final ValueChanged<AppTab> onTap;
 
-  static const double _barContentHeight = 68.0;
+  static const double _barContentHeight = AppInsets.navBarContentHeight;
 
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Container(
       width: double.infinity,
@@ -225,6 +255,7 @@ class _BottomNavBar extends StatelessWidget {
                 label: _label(tab),
                 selected: isActive,
                 child: _NavItem(
+                  key: _tourKey(tab),
                   active: isActive,
                   icon: Icon(
                     isActive ? _fillIcon(tab) : _outlineIcon(tab),
@@ -261,9 +292,17 @@ class _BottomNavBar extends StatelessWidget {
     );
   }
 
+  GlobalKey? _tourKey(AppTab t) => switch (t) {
+        AppTab.dashboard => TourGuideKeys.navDashboard,
+        AppTab.routine => TourGuideKeys.navRoutine,
+        AppTab.focus => TourGuideKeys.navFocus,
+        AppTab.notes => TourGuideKeys.navNotes,
+        AppTab.profile => TourGuideKeys.navProfile,
+      };
+
   IconData _fillIcon(AppTab t) => switch (t) {
         AppTab.dashboard => Icons.grid_view_rounded,
-        AppTab.routine => Icons.calendar_month_rounded,
+        AppTab.routine => Icons.school_rounded,
         AppTab.focus => Icons.timer_rounded,
         AppTab.notes => Icons.description,
         AppTab.profile => Icons.person_rounded,
@@ -271,7 +310,7 @@ class _BottomNavBar extends StatelessWidget {
 
   IconData _outlineIcon(AppTab t) => switch (t) {
         AppTab.dashboard => Icons.grid_view_outlined,
-        AppTab.routine => Icons.calendar_month_outlined,
+        AppTab.routine => Icons.school_outlined,
         AppTab.focus => Icons.timer_outlined,
         AppTab.notes => Icons.description_outlined,
         AppTab.profile => Icons.person_outline_rounded,
@@ -279,7 +318,7 @@ class _BottomNavBar extends StatelessWidget {
 
   String _label(AppTab t) => switch (t) {
         AppTab.dashboard => 'Dashboard',
-        AppTab.routine => 'Routine',
+        AppTab.routine => 'Classes',
         AppTab.focus => 'Focus',
         AppTab.notes => 'Notes',
         AppTab.profile => 'Profile',
@@ -287,7 +326,9 @@ class _BottomNavBar extends StatelessWidget {
 }
 
 /// One nav item: icon scale-pops on activation, label fades in.
-class _NavItem extends StatefulWidget {  const _NavItem({
+class _NavItem extends StatefulWidget {
+  const _NavItem({
+    super.key,
     required this.active,
     required this.icon,
     required this.label,

@@ -5,6 +5,16 @@ enum TaskPriority { high, medium, low }
 enum TaskStatus { pending, completed }
 enum ReminderType { atTime, oneHour, oneDay, twoDays, threeDays, sevenDays, oneWeek, custom }
 
+extension SafeEnumByName<T extends Enum> on Iterable<T> {
+  T byNameOr(dynamic name, T fallback) {
+    if (name == null) return fallback;
+    for (final v in this) {
+      if (v.name == name) return v;
+    }
+    return fallback;
+  }
+}
+
 class Reminder {
   final String id;
   final ReminderType type;
@@ -26,10 +36,10 @@ class Reminder {
   };
 
   factory Reminder.fromJson(Map<String, dynamic> j) => Reminder(
-    id: j['id'],
-    type: ReminderType.values.byName(j['type']),
-    customDays: j['customDays'],
-    notificationId: j['notificationId'],
+    id: j['id'] as String?,
+    type: ReminderType.values.byNameOr(j['type'], ReminderType.atTime),
+    customDays: j['customDays'] as int?,
+    notificationId: j['notificationId'] as String?,
   );
 }
 
@@ -38,6 +48,7 @@ class Task {
   final String title;
   final String? description;
   final TaskType type;
+  final String? customCategory;
   final String dueDate;      // 'YYYY-MM-DD'
   final String? dueTime;     // 'HH:mm'
   final bool hasTime;
@@ -56,6 +67,7 @@ class Task {
     required this.title,
     this.description,
     required this.type,
+    this.customCategory,
     required this.dueDate,
     this.dueTime,
     this.hasTime = false,
@@ -73,6 +85,8 @@ class Task {
     String? title,
     String? description,
     TaskType? type,
+    String? customCategory,
+    bool clearCustomCategory = false,
     String? dueDate,
     String? dueTime,
     bool? hasTime,
@@ -90,6 +104,7 @@ class Task {
     title: title ?? this.title,
     description: description ?? this.description,
     type: type ?? this.type,
+    customCategory: clearCustomCategory ? null : (customCategory ?? this.customCategory),
     dueDate: dueDate ?? this.dueDate,
     dueTime: dueTime ?? this.dueTime,
     hasTime: hasTime ?? this.hasTime,
@@ -106,6 +121,7 @@ class Task {
     'title': title,
     'description': description,
     'type': type.name,
+    if (customCategory != null) 'customCategory': customCategory,
     'dueDate': dueDate,
     'dueTime': dueTime,
     'hasTime': hasTime,
@@ -119,20 +135,26 @@ class Task {
   };
 
   factory Task.fromJson(Map<String, dynamic> j) => Task(
-    id: j['id'],
-    title: j['title'],
-    description: j['description'],
-    type: TaskType.values.byName(j['type']),
-    dueDate: j['dueDate'],
-    dueTime: j['dueTime'],
-    hasTime: j['hasTime'] ?? false,
-    priority: TaskPriority.values.byName(j['priority']),
-    status: TaskStatus.values.byName(j['status']),
-    reminders: (j['reminders'] as List? ?? [])
-        .map((r) => Reminder.fromJson(Map<String, dynamic>.from(r)))
-        .toList(),
-    createdAt: j['createdAt'],
-    completedAt: j['completedAt'],
+    id: j['id'] as String?,
+    title: j['title'] as String? ?? '',
+    description: j['description'] as String?,
+    type: TaskType.values.byNameOr(j['type'], TaskType.other),
+    customCategory: j['customCategory'] as String?,
+    dueDate: j['dueDate'] as String? ?? '',
+    dueTime: j['dueTime'] as String?,
+    hasTime: j['hasTime'] as bool? ?? false,
+    priority: TaskPriority.values.byNameOr(j['priority'], TaskPriority.medium),
+    status: TaskStatus.values.byNameOr(j['status'], TaskStatus.pending),
+    reminders: (j['reminders'] as List? ?? []).map((r) {
+      try {
+        if (r is Map) {
+          return Reminder.fromJson(Map<String, dynamic>.from(r));
+        }
+      } catch (_) {}
+      return null;
+    }).whereType<Reminder>().toList(),
+    createdAt: j['createdAt'] as String?,
+    completedAt: j['completedAt'] as String?,
     courseId: j['courseId'] as String?,
     isSample: j['isSample'] as bool? ?? false,
   );

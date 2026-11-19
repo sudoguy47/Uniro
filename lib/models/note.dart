@@ -180,6 +180,8 @@ class Note {
   final String id;
   final String title;
   final List<NoteBlock> blocks;
+  /// AES-GCM ciphertext payload stored at rest when [isLocked] is true.
+  final String? encryptedPayload;
   final String folder;
   final int? colorTag;
   final bool isPinned;
@@ -194,6 +196,7 @@ class Note {
     required this.id,
     this.title = '',
     this.blocks = const [],
+    this.encryptedPayload,
     this.folder = 'Personal',
     this.colorTag,
     this.isPinned = false,
@@ -204,18 +207,29 @@ class Note {
     this.isSample = false,
   });
 
-  bool get isEmpty =>
-      title.trim().isEmpty && blocks.every((b) => b.text.trim().isEmpty);
+  bool get isEmpty {
+    if (isLocked) {
+      return title.trim().isEmpty && (encryptedPayload == null || encryptedPayload!.isEmpty);
+    }
+    return title.trim().isEmpty && blocks.every((b) => b.text.trim().isEmpty);
+  }
 
-  String get previewText => blocks
-      .where((b) => b.text.trim().isNotEmpty)
-      .take(3)
-      .map((b) => b.text)
-      .join('\n');
+  String get previewText {
+    if (isLocked) {
+      return 'Locked Note';
+    }
+    return blocks
+        .where((b) => b.text.trim().isNotEmpty)
+        .take(3)
+        .map((b) => b.text)
+        .join('\n');
+  }
 
   Note copyWith({
     String? title,
     List<NoteBlock>? blocks,
+    String? encryptedPayload,
+    bool clearEncryptedPayload = false,
     String? folder,
     int? colorTag,
     bool? isPinned,
@@ -228,6 +242,7 @@ class Note {
     id: id,
     title: title ?? this.title,
     blocks: blocks ?? this.blocks,
+    encryptedPayload: clearEncryptedPayload ? null : (encryptedPayload ?? this.encryptedPayload),
     folder: folder ?? this.folder,
     colorTag: colorTag ?? this.colorTag,
     isPinned: isPinned ?? this.isPinned,
@@ -241,7 +256,11 @@ class Note {
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
-    'blocks': blocks.map((b) => b.toJson()).toList(),
+    // When locked and encrypted, strip plaintext blocks from disk serialization
+    'blocks': isLocked && encryptedPayload != null
+        ? const []
+        : blocks.map((b) => b.toJson()).toList(),
+    if (encryptedPayload != null) 'encryptedPayload': encryptedPayload,
     'folder': folder,
     if (colorTag != null) 'colorTag': colorTag,
     'isPinned': isPinned,
@@ -258,6 +277,7 @@ class Note {
     blocks: (j['blocks'] as List<dynamic>? ?? [])
         .map((b) => NoteBlock.fromJson(b as Map<String, dynamic>))
         .toList(),
+    encryptedPayload: j['encryptedPayload'] as String?,
     folder: j['folder'] as String? ?? 'Personal',
     colorTag: j['colorTag'] as int?,
     isPinned: j['isPinned'] as bool? ?? false,

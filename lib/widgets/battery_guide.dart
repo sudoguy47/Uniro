@@ -6,6 +6,7 @@ import '../services/device_channel.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
+import 'app_notification.dart';
 
 /// Manufacturer-specific first line for the battery guide. [maker] is
 /// Build.MANUFACTURER (lowercased before matching).
@@ -66,17 +67,16 @@ class BatteryHint {
       if (captured == null) return;
       Future<void>.delayed(const Duration(milliseconds: 700), () {
         try {
-          captured.showSnackBar(
-            SnackBar(
-              content: const Text(
-                  'Reminders not arriving? See battery tips in Profile.'),
+          final ctx = AppShell.shellKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            AppNotification.show(
+              ctx,
+              message: 'Reminders not arriving? See battery tips in Profile.',
+              actionLabel: 'View tips',
+              onAction: () => AppShell.openTab(AppTab.profile),
               duration: const Duration(seconds: 6),
-              action: SnackBarAction(
-                label: 'View tips',
-                onPressed: () => AppShell.openTab(AppTab.profile),
-              ),
-            ),
-          );
+            );
+          }
         } catch (_) {}
       });
     } catch (_) {}
@@ -129,13 +129,17 @@ class _BatteryGuideCardState extends State<BatteryGuideCard> {
     try {
       final ok = await NotificationService.instance.scheduleTestReminder();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok
-              ? 'Test reminder set — lock the screen and wait 1 minute.'
-              : "Couldn't schedule the test reminder."),
-        ),
-      );
+      if (ok) {
+        AppNotification.info(
+          context,
+          'Test reminder set — lock the screen and wait 1 minute.',
+        );
+      } else {
+        AppNotification.error(
+          context,
+          "Couldn't schedule the test reminder.",
+        );
+      }
     } finally {
       if (mounted) setState(() => _testing = false);
     }

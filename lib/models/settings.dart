@@ -85,7 +85,10 @@ class UserSettings {
     examReminderDays: j['examReminderDays'] ?? 3,
     notificationsEnabled: j['notificationsEnabled'] ?? true,
     theme: j['theme'] != null
-        ? AppThemeMode.values.byName(j['theme'])
+        ? AppThemeMode.values.firstWhere(
+            (e) => e.name == j['theme'],
+            orElse: () => AppThemeMode.light,
+          )
         : AppThemeMode.light,
     weekStartDay: (j['weekStartDay'] as num?)?.toInt() ?? DateTime.saturday,
     dashboardView: j['dashboardView'] ?? 'active',

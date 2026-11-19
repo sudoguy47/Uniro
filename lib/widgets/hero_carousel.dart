@@ -39,7 +39,7 @@ class _HeroCarouselState extends State<HeroCarousel>
     WidgetsBinding.instance.addObserver(this);
     _pageCtrl = PageController(viewportFraction: 0.88);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _startAutoScroll();
+      if (mounted && widget.tasks.length > 1) _startAutoScroll();
     });
   }
 
@@ -47,7 +47,14 @@ class _HeroCarouselState extends State<HeroCarousel>
   void didUpdateWidget(covariant HeroCarousel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.tasks, widget.tasks)) {
-      _currentPage = _currentPage.clamp(0, widget.tasks.length - 1);
+      if (widget.tasks.isEmpty) {
+        _currentPage = 0;
+      } else {
+        _currentPage = _currentPage.clamp(0, widget.tasks.length - 1);
+        if (_pageCtrl.hasClients) {
+          _pageCtrl.jumpToPage(_currentPage);
+        }
+      }
       // Identity changed (filter/completion) — restart cleanly, no overlap.
       _startAutoScroll();
     }
@@ -86,8 +93,10 @@ class _HeroCarouselState extends State<HeroCarousel>
   }
 
   void _onPageChanged(int index) {
-    if (_currentPage == index) return;
-    setState(() => _currentPage = index);
+    if (widget.tasks.isEmpty) return;
+    final clamped = index.clamp(0, widget.tasks.length - 1);
+    if (_currentPage == clamped) return;
+    setState(() => _currentPage = clamped);
     // Pause auto-scroll on manual swipe, resume after idle delay.
     _timer?.cancel();
     _pauseTimer?.cancel();
@@ -110,6 +119,10 @@ class _HeroCarouselState extends State<HeroCarousel>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.tasks.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final c = Theme.of(context).extension<AppColors>()!;
 
     return Column(

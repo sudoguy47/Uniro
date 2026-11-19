@@ -42,6 +42,8 @@ class _NewTaskSheetState extends State<NewTaskSheet>
 
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _customCategoryCtrl = TextEditingController();
+  final _customCategoryFocusNode = FocusNode();
 
   late TaskType _type;
   String? _courseId;
@@ -89,6 +91,8 @@ class _NewTaskSheetState extends State<NewTaskSheet>
     _slideCtrl.dispose();
     _titleCtrl.dispose();
     _descCtrl.dispose();
+    _customCategoryCtrl.dispose();
+    _customCategoryFocusNode.dispose();
     super.dispose();
   }
 
@@ -109,10 +113,14 @@ class _NewTaskSheetState extends State<NewTaskSheet>
         ? '${_dueTime!.hour.toString().padLeft(2, '0')}:${_dueTime!.minute.toString().padLeft(2, '0')}'
         : null;
 
+    final customCategoryText = _customCategoryCtrl.text.trim();
     final task = Task(
       title: title,
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
       type: _type,
+      customCategory: _type == TaskType.custom
+          ? (customCategoryText.isNotEmpty ? customCategoryText : 'Custom')
+          : null,
       dueDate: dateStr,
       dueTime: timeStr,
       hasTime: _hasTime,
@@ -156,7 +164,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    final screenHeight = MediaQuery.of(context).size.height;
+    final screenHeight = MediaQuery.sizeOf(context).height;
 
     return PopScope(
       canPop: false,
@@ -251,11 +259,11 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                   // 2. Scrollable Form Content (One-Handed Flow)
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
+                      padding: const EdgeInsets.fromLTRB(
+                        20,
+                        12,
                         20,
                         14,
-                        20,
-                        88 + MediaQuery.of(context).viewInsets.bottom,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,13 +282,21 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                               fillColor: c.inputBg,
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 12),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.borderLight),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.accent, width: 1.5),
+                              ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.borderLight),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           _label('DESCRIPTION', c),
                           const SizedBox(height: 6),
@@ -296,13 +312,21 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                               fillColor: c.inputBg,
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 14, vertical: 12),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.borderLight),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.accent, width: 1.5),
+                              ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide(color: c.borderLight),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           _label('CATEGORY / TYPE', c),
                           const SizedBox(height: 6),
@@ -357,6 +381,8 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                             itemBuilder: (ctx, i) {
                                               final t = TaskType.values[i];
                                               final isCurrent = t == _type;
+                                              final isCustom = t == TaskType.custom;
+                                              final customText = _customCategoryCtrl.text.trim();
                                               return ListTile(
                                                 leading: Icon(
                                                     _iconForType(t),
@@ -364,7 +390,9 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                                         ? c.accent
                                                         : c.textSecondary),
                                                 title: Text(
-                                                  _formatType(t),
+                                                  isCustom && customText.isNotEmpty
+                                                      ? 'Custom ($customText)'
+                                                      : _formatType(t),
                                                   style: TextStyle(
                                                     fontWeight: isCurrent
                                                         ? FontWeight.bold
@@ -391,6 +419,13 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                               );
                               if (selected != null) {
                                 setState(() => _type = selected);
+                                if (selected == TaskType.custom) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) {
+                                      _customCategoryFocusNode.requestFocus();
+                                    }
+                                  });
+                                }
                               }
                             },
                             child: Container(
@@ -399,27 +434,142 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                   const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: c.inputBg,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: c.borderLight),
                               ),
                               child: Row(
                                 children: [
                                   Icon(_iconForType(_type),
                                       size: 18, color: c.accent),
                                   const SizedBox(width: 10),
-                                  Text(
-                                    _formatType(_type),
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: c.textPrimary),
+                                  Expanded(
+                                    child: Text(
+                                      _type == TaskType.custom &&
+                                              _customCategoryCtrl.text.trim().isNotEmpty
+                                          ? _customCategoryCtrl.text.trim()
+                                          : _formatType(_type),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: c.textPrimary),
+                                    ),
                                   ),
-                                  const Spacer(),
                                   Icon(Icons.keyboard_arrow_down,
                                       color: c.textSecondary),
                                 ],
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          if (_type == TaskType.custom) ...[
+                            const SizedBox(height: 12),
+                            _label('CUSTOM CATEGORY NAME', c),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _customCategoryCtrl,
+                              focusNode: _customCategoryFocusNode,
+                              textCapitalization: TextCapitalization.words,
+                              style: TextStyle(fontSize: 14, color: c.textPrimary),
+                              decoration: InputDecoration(
+                                hintText: 'e.g. Weekly CT, Personal Work, Shopping...',
+                                hintStyle: TextStyle(
+                                    color: c.textTertiary, fontSize: 13),
+                                filled: true,
+                                fillColor: c.inputBg,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: c.borderLight),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide:
+                                      BorderSide(color: c.accent, width: 1.5),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: c.borderLight),
+                                ),
+                                suffixIcon: _customCategoryCtrl.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: Icon(Icons.clear,
+                                            size: 16, color: c.textTertiary),
+                                        onPressed: () {
+                                          _customCategoryCtrl.clear();
+                                          setState(() {});
+                                        },
+                                      )
+                                    : null,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                            const SizedBox(height: 8),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  for (final suggestion in const [
+                                    'Weekly CT',
+                                    'Personal Work',
+                                    'Outdoor Activities',
+                                    'Travel Plans',
+                                    'Shopping',
+                                    'Other Personal',
+                                  ])
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ActionChip(
+                                        visualDensity: VisualDensity.compact,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        backgroundColor: _customCategoryCtrl
+                                                    .text
+                                                    .trim()
+                                                    .toLowerCase() ==
+                                                suggestion.toLowerCase()
+                                            ? c.accent.withValues(alpha: 0.2)
+                                            : c.cardBgRaised,
+                                        side: BorderSide(
+                                          color: _customCategoryCtrl.text
+                                                      .trim()
+                                                      .toLowerCase() ==
+                                                  suggestion.toLowerCase()
+                                              ? c.accent
+                                              : c.border,
+                                        ),
+                                        label: Text(
+                                          suggestion,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: _customCategoryCtrl.text
+                                                        .trim()
+                                                        .toLowerCase() ==
+                                                    suggestion.toLowerCase()
+                                                ? c.accent
+                                                : c.textSecondary,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          PremiumHaptics.tap();
+                                          _customCategoryCtrl.text = suggestion;
+                                          _customCategoryCtrl.selection =
+                                              TextSelection.fromPosition(
+                                            TextPosition(
+                                                offset: suggestion.length),
+                                          );
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
 
                           _label('COURSE (OPTIONAL)', c),
                           const SizedBox(height: 6),
@@ -428,7 +578,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                             onChanged: (v) =>
                                 setState(() => _courseId = v),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           Row(
                             children: [
@@ -460,7 +610,9 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                         decoration: BoxDecoration(
                                           color: c.inputBg,
                                           borderRadius:
-                                              BorderRadius.circular(12),
+                                              BorderRadius.circular(14),
+                                          border:
+                                              Border.all(color: c.borderLight),
                                         ),
                                         child: Row(
                                           children: [
@@ -510,7 +662,9 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                         decoration: BoxDecoration(
                                           color: c.inputBg,
                                           borderRadius:
-                                              BorderRadius.circular(12),
+                                              BorderRadius.circular(14),
+                                          border:
+                                              Border.all(color: c.borderLight),
                                         ),
                                         child: Row(
                                           children: [
@@ -559,7 +713,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           _label('PRIORITY', c),
                           const SizedBox(height: 8),
@@ -567,7 +721,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                             value: _priority,
                             onChange: (p) => setState(() => _priority = p),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           _label('NOTIFICATIONS & REMINDERS', c),
                           const SizedBox(height: 8),
@@ -580,7 +734,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                         horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       color: c.accentLight,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(14),
                                       border: Border.all(color: c.accent),
                                     ),
                                     child: Row(
@@ -613,7 +767,7 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
                                         color: c.accent,
                                         style: BorderStyle.solid),
@@ -641,37 +795,44 @@ class _NewTaskSheetState extends State<NewTaskSheet>
                       ),
                     ),
                   ),
-
-                    ],
-                  ),
-
-                  // 3. FLOATING SAVE TASK BUTTON (Pure Floating Button)
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
-                    child: SafeArea(
-                      top: false,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: [
-                            BoxShadow(
-                              color: c.accent.withValues(alpha: 0.38),
-                              blurRadius: 16,
-                              offset: const Offset(0, 5),
+                  // 3. Static save footer — always in thumb reach, never
+                  // overlaps the form (primary CTA, no glow).
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Divider(height: 1, color: c.borderLight),
+                      SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 52,
+                            child: TextButton(
+                              onPressed: _saveTask,
+                              style: TextButton.styleFrom(
+                                backgroundColor: c.accent,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: const Text(
+                                'Save Task',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
-                        child: SizedBox(
-                          height: 52,
-                          child: PrimaryButton(
-                            label: 'Save Task',
-                            onPressed: _saveTask,
                           ),
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                    ],
                   ),
                 ],
               ),
@@ -693,9 +854,9 @@ class _NewTaskSheetState extends State<NewTaskSheet>
     return Text(
       text,
       style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.0,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.4,
         color: c.textTertiary,
       ),
     );
@@ -810,7 +971,8 @@ class _CourseField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.inputBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.borderLight),
         ),
         child: Row(
           children: [

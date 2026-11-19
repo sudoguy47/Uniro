@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../core/logger.dart';
 
 /// Thin wrapper around the app's own `dev.sudoguy.uniro/device`
 /// MethodChannel (see MainActivity.kt). Every call is guarded and returns
@@ -14,13 +14,13 @@ class DeviceChannel {
       if (v != null && v.isNotEmpty) return v;
       return null;
     } on PlatformException catch (e) {
-      debugPrint('device getTimeZoneId notice: $e');
+      AppLog.w('device getTimeZoneId notice', e);
       return null;
     } on MissingPluginException catch (e) {
-      debugPrint('device getTimeZoneId missing plugin: $e');
+      AppLog.d('device getTimeZoneId missing plugin: $e');
       return null;
     } catch (e) {
-      debugPrint('device getTimeZoneId notice: $e');
+      AppLog.w('device getTimeZoneId notice', e);
       return null;
     }
   }
@@ -32,13 +32,13 @@ class DeviceChannel {
       final v = await _channel.invokeMethod<bool>('getNeedsReschedule');
       return v ?? false;
     } on PlatformException catch (e) {
-      debugPrint('device getNeedsReschedule notice: $e');
+      AppLog.w('device getNeedsReschedule notice', e);
       return false;
     } on MissingPluginException catch (e) {
-      debugPrint('device getNeedsReschedule missing plugin: $e');
+      AppLog.d('device getNeedsReschedule missing plugin: $e');
       return false;
     } catch (e) {
-      debugPrint('device getNeedsReschedule notice: $e');
+      AppLog.w('device getNeedsReschedule notice', e);
       return false;
     }
   }
@@ -47,11 +47,11 @@ class DeviceChannel {
     try {
       await _channel.invokeMethod('clearNeedsReschedule');
     } on PlatformException catch (e) {
-      debugPrint('device clearNeedsReschedule notice: $e');
+      AppLog.w('device clearNeedsReschedule notice', e);
     } on MissingPluginException catch (e) {
-      debugPrint('device clearNeedsReschedule missing plugin: $e');
+      AppLog.d('device clearNeedsReschedule missing plugin: $e');
     } catch (e) {
-      debugPrint('device clearNeedsReschedule notice: $e');
+      AppLog.w('device clearNeedsReschedule notice', e);
     }
   }
 
@@ -62,7 +62,7 @@ class DeviceChannel {
           await _channel.invokeMapMethod<String, dynamic>('getDeviceInfo');
       return v == null ? null : Map<String, dynamic>.from(v);
     } catch (e) {
-      debugPrint('device getDeviceInfo notice: $e');
+      AppLog.w('device getDeviceInfo notice', e);
       return null;
     }
   }
@@ -72,7 +72,7 @@ class DeviceChannel {
     try {
       return await _channel.invokeMethod<bool>('areNotificationsEnabled');
     } catch (e) {
-      debugPrint('device areNotificationsEnabled notice: $e');
+      AppLog.w('device areNotificationsEnabled notice', e);
       return null;
     }
   }
@@ -82,7 +82,7 @@ class DeviceChannel {
     try {
       return await _channel.invokeMethod<bool>('canScheduleExactAlarms');
     } catch (e) {
-      debugPrint('device canScheduleExactAlarms notice: $e');
+      AppLog.w('device canScheduleExactAlarms notice', e);
       return null;
     }
   }
@@ -93,7 +93,7 @@ class DeviceChannel {
       return await _channel
           .invokeMethod<bool>('isIgnoringBatteryOptimizations');
     } catch (e) {
-      debugPrint('device battery notice: $e');
+      AppLog.w('device battery notice', e);
       return null;
     }
   }
@@ -105,7 +105,7 @@ class DeviceChannel {
           .invokeMethod<bool>('openBatteryOptimizationSettings');
       return v ?? false;
     } catch (e) {
-      debugPrint('device openBattery notice: $e');
+      AppLog.w('device openBattery notice', e);
       return false;
     }
   }
@@ -115,7 +115,7 @@ class DeviceChannel {
       final v = await _channel.invokeMethod<bool>('openAppSettings');
       return v ?? false;
     } catch (e) {
-      debugPrint('device openAppSettings notice: $e');
+      AppLog.w('device openAppSettings notice', e);
       return false;
     }
   }
@@ -125,7 +125,7 @@ class DeviceChannel {
     try {
       return await _channel.invokeMethod<bool>('hasVibrator');
     } catch (e) {
-      debugPrint('device hasVibrator notice: $e');
+      AppLog.d('device hasVibrator notice: $e');
       return null;
     }
   }
@@ -135,7 +135,7 @@ class DeviceChannel {
     try {
       return await _channel.invokeMethod<bool>('isTouchHapticsEnabled');
     } catch (e) {
-      debugPrint('device touchHaptics notice: $e');
+      AppLog.d('device touchHaptics notice: $e');
       return null;
     }
   }
@@ -150,7 +150,7 @@ class DeviceChannel {
       if (res is num) return res == 1;
       return null;
     } catch (e) {
-      debugPrint('device selectionTick notice: $e');
+      AppLog.d('device selectionTick notice: $e');
       return null;
     }
   }
@@ -163,19 +163,20 @@ class DeviceChannel {
           .invokeMethod<bool>('openInstallPermissionSettings');
       return v ?? false;
     } catch (e) {
-      debugPrint('device installPermSettings notice: $e');
+      AppLog.w('device installPermSettings notice', e);
       return false;
     }
   }
 
   /// Photo/gallery permission state: 'granted', 'denied',
   /// 'permanentlyDenied' or 'unknown'. Never throws.
-  static Future<String> getStoragePermissionStatus() async {    try {
+  static Future<String> getStoragePermissionStatus() async {
+    try {
       final v =
           await _channel.invokeMethod<String>('getStoragePermissionStatus');
       return v ?? 'unknown';
     } catch (e) {
-      debugPrint('device storageStatus notice: $e');
+      AppLog.w('device storageStatus notice', e);
       return 'unknown';
     }
   }
@@ -189,7 +190,7 @@ class DeviceChannel {
           await _channel.invokeMethod<String>('requestStoragePermission');
       return v ?? 'unknown';
     } catch (e) {
-      debugPrint('device storageRequest notice: $e');
+      AppLog.w('device storageRequest notice', e);
       return 'unknown';
     }
   }
@@ -201,7 +202,7 @@ class DeviceChannel {
       if (v != null && v.isNotEmpty) return v;
       return null;
     } catch (e) {
-      debugPrint('device getCacheDir notice: $e');
+      AppLog.w('device getCacheDir notice', e);
       return null;
     }
   }
@@ -224,7 +225,7 @@ class DeviceChannel {
       );
       return v == null ? null : Map<String, dynamic>.from(v);
     } catch (e) {
-      debugPrint('device verifyApk notice: $e');
+      AppLog.w('device verifyApk notice', e);
       return null;
     }
   }
@@ -238,10 +239,10 @@ class DeviceChannel {
           await _channel.invokeMethod<String>('installApk', {'path': path});
       return v ?? 'error';
     } on PlatformException catch (e) {
-      debugPrint('device installApk notice: $e');
+      AppLog.w('device installApk notice', e);
       throw UpdateExceptionBridge(e.message ?? 'Could not open installer.');
     } catch (e) {
-      debugPrint('device installApk notice: $e');
+      AppLog.w('device installApk notice', e);
       return 'error';
     }
   }

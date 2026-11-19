@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'app/app.dart';
+import 'core/logger.dart';
 import 'services/device_channel.dart';
 import 'services/error_log.dart';
 import 'domain/haptics.dart';
@@ -12,14 +13,19 @@ import 'services/local_store.dart';
 import 'services/notes_store.dart';
 import 'services/notification_service.dart';
 import 'services/update_service.dart';
+import 'widgets/app_notification.dart';
 import 'state/app_state.dart';
+import 'state/attendance_state.dart';
 import 'state/focus_state.dart';
 import 'state/notes_state.dart';
 import 'state/routine_state.dart';
 import 'widgets/update_dialog.dart';
 
 void main() {
-  // Global error capture first, so even bootstrap failures are logged.
+  // ① Flutter binding initialization first
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Global error capture, so even bootstrap failures are logged.
   // Local only: last 20 errors, no network.
   ErrorLog.install();
   if (kReleaseMode) {
@@ -72,6 +78,7 @@ Future<void> _boot() async {
   final notesStore = NotesStore();
   final routineState = RoutineState();
   final focusState = FocusState();
+  final attendanceState = AttendanceState();
   NotesState? notesState;
   bool showOnboarding = true;
   try {
@@ -86,9 +93,14 @@ Future<void> _boot() async {
     notesState = NotesState(store: notesStore);
     await routineState.load();
     await focusState.load();
+    await attendanceState.load();
     showOnboarding = !LocalStore.instance.isOnboardingDone;
-  } catch (e) {
-    debugPrint('Bootstrap notice (mounting defaults): $e');
+    // Foreground attendance taps on a notification refresh RAM instantly.
+    NotificationService.attendanceActionListener =
+        (slotId, date, actionId) =>
+            attendanceState.handleNotificationAction(slotId, date, actionId);
+  } catch (e, st) {
+    AppLog.w('Bootstrap notice (mounting defaults): $e', e, st);
     LocalStore.instance.markRecovery();
     notesState ??= NotesState(store: notesStore);
     showOnboarding = true;
@@ -103,6 +115,7 @@ Future<void> _boot() async {
         ChangeNotifierProvider(create: (_) => readyNotes),
         ChangeNotifierProvider.value(value: routineState),
         ChangeNotifierProvider.value(value: focusState),
+        ChangeNotifierProvider.value(value: attendanceState),
       ],
       child: CampusTrackerApp(showOnboarding: showOnboarding),
     ),
@@ -126,11 +139,10 @@ void _maybeShowRecoveryBanner() {
   final nav = CampusTrackerApp.navigatorKey.currentState;
   final ctx = nav?.context;
   if (ctx == null || !ctx.mounted) return;
-  ScaffoldMessenger.of(ctx).showSnackBar(
-    const SnackBar(
-      content: Text("Some data couldn't be read and was backed up."),
-      duration: Duration(seconds: 5),
-    ),
+  AppNotification.warning(
+    ctx,
+    "Some data couldn't be read and was backed up.",
+    duration: const Duration(seconds: 5),
   );
 }
 
@@ -203,8 +215,8 @@ void _scheduleDeferredWarmup(RoutineState routineState) {
           enabled: app.settings.notificationsEnabled,
         );
       }
-    } catch (e) {
-      debugPrint('deferred notify warmup notice: $e');
+    } catch (e, st) {
+      AppLog.w('deferred notify warmup notice: $e', e, st);
     }
   });
 }
@@ -220,7 +232,7 @@ void _prewarmFontsAndAssets() {
       textDirection: TextDirection.ltr,
     )..layout();
     textPainter.dispose();
-  } catch (e) {
-    debugPrint('Font prewarm notice: $e');
+  } catch (e, st) {
+    AppLog.w('Font prewarm notice: $e', e, st);
   }
 }

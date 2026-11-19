@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/responsive.dart';
 import '../../models/note.dart';
+import '../../services/note_security_service.dart';
 import '../../state/notes_state.dart';
+import '../../widgets/app_notification.dart';
+import '../../widgets/notes/empty_notes_state.dart';
+import '../../widgets/notes/floating_note_pill.dart';
 import '../../widgets/notes/folder_chips_row.dart';
 import '../../widgets/notes/note_card.dart';
-import '../../widgets/notes/floating_note_pill.dart';
-import '../../widgets/notes/empty_notes_state.dart';
 import 'note_editor_screen.dart';
 
 class NotesScreen extends StatefulWidget {
@@ -41,9 +44,50 @@ class _NotesScreenState extends State<NotesScreen>
     });
   }
 
-  void _openEditor(Note note) {
+  Future<void> _openEditor(Note note) async {
+    Note noteToOpen = note;
+    if (note.isLocked) {
+      final canAuth = await NoteSecurityService.instance.canAuthenticate();
+      if (!mounted) return;
+      if (!canAuth) {
+        AppNotification.show(
+          context,
+          message: 'To open locked notes, please set up a screen lock (PIN, pattern, or biometrics) in device settings.',
+        );
+        return;
+      }
+      final ok = await NoteSecurityService.instance.authenticate(
+        localizedReason: 'Authenticate to open "${note.title.isNotEmpty ? note.title : 'Locked Note'}"',
+      );
+      if (!mounted) return;
+      if (!ok) {
+        AppNotification.show(
+          context,
+          message: 'Authentication required to open locked note',
+        );
+        return;
+      }
+      if (note.encryptedPayload != null && note.encryptedPayload!.isNotEmpty) {
+        try {
+          final decrypted = await NoteSecurityService.instance.decryptBlocks(note.encryptedPayload!);
+          noteToOpen = note.copyWith(blocks: decrypted);
+        } catch (e) {
+          if (!mounted) return;
+          AppNotification.show(
+            context,
+            message: 'Could not decrypt note: $e',
+          );
+          return;
+        }
+      }
+    }
+
+    if (!mounted) return;
     Navigator.of(context).push(PageRouteBuilder(
-      pageBuilder: (_, __, ___) => NoteEditorScreen(noteId: note.id),
+      pageBuilder: (_, __, ___) => NoteEditorScreen(
+        noteId: noteToOpen.id,
+        initialNote: noteToOpen,
+      ),
       transitionsBuilder: (_, anim, __, child) => SlideTransition(
         position: Tween(begin: const Offset(0, 1), end: Offset.zero).animate(
           CurvedAnimation(parent: anim, curve: Curves.easeOutCubic),
@@ -62,18 +106,12 @@ class _NotesScreenState extends State<NotesScreen>
   void _deleteNote(Note note) {
     final deleted = context.read<NotesState>().deleteNote(note.id);
     if (deleted == null) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('Note deleted'),
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'UNDO',
-            onPressed: () => context.read<NotesState>().restoreNote(deleted),
-          ),
-        ),
-      );
+    AppNotification.show(
+      context,
+      message: 'Note deleted',
+      actionLabel: 'UNDO',
+      onAction: () => context.read<NotesState>().restoreNote(deleted),
+    );
   }
 
   @override
@@ -165,18 +203,16 @@ class _NotesScreenState extends State<NotesScreen>
                 ),
 
                 // Bottom padding to avoid nav bar and floating pill
-                const SliverPadding(padding: EdgeInsets.only(bottom: 140)),
+                SliverPadding(
+                    padding: EdgeInsets.only(
+                        bottom:
+                            AppInsets.bottomNavClearance(context, extra: 72))),
               ],
             ),
 
-            // Floating pill above bottom nav bar. The docked nav is
-            // 68dp + the full bottom system inset tall, so clear it by
-            // that amount plus a 12dp gap on every device (the old
-            // 0.4*inset math overlapped the bar on gesture navigation).
+            // Floating pill above bottom nav bar.
             Positioned(
-              bottom: 68 +
-                  MediaQuery.of(context).padding.bottom +
-                  12,
+              bottom: AppInsets.bottomNavClearance(context, extra: 12),
               left: 0,
               right: 0,
               child: FloatingNotePill(

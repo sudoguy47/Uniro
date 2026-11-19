@@ -63,21 +63,29 @@ class Course {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'code': code,
-        'colorTag': colorTag,
-        'teacher': teacher,
-        'room': room,
-        'credits': credits,
+        if (code != null && code!.trim().isNotEmpty && code != 'null') 'code': code,
+        if (colorTag != null) 'colorTag': colorTag,
+        if (teacher != null && teacher!.trim().isNotEmpty && teacher != 'null') 'teacher': teacher,
+        if (room != null && room!.trim().isNotEmpty && room != 'null') 'room': room,
+        if (credits != null) 'credits': credits,
         if (isSample) 'isSample': true,
       };
 
   factory Course.fromJson(Map<String, dynamic> j) => Course(
         id: j['id'] as String?,
-        name: j['name'] as String? ?? '',
-        code: j['code'] as String?,
+        name: (j['name'] as String?)?.trim().isNotEmpty == true && j['name'] != 'null'
+            ? j['name'] as String
+            : 'Class',
+        code: (j['code'] as String?)?.trim().isNotEmpty == true && j['code'] != 'null'
+            ? j['code'] as String
+            : null,
         colorTag: (j['colorTag'] as num?)?.toInt(),
-        teacher: j['teacher'] as String?,
-        room: j['room'] as String?,
+        teacher: (j['teacher'] as String?)?.trim().isNotEmpty == true && j['teacher'] != 'null'
+            ? j['teacher'] as String
+            : null,
+        room: (j['room'] as String?)?.trim().isNotEmpty == true && j['room'] != 'null'
+            ? j['room'] as String
+            : null,
         credits: (j['credits'] as num?)?.toDouble(),
         isSample: j['isSample'] as bool? ?? false,
       );
