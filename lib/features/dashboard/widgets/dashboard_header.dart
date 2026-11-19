@@ -385,10 +385,7 @@ class _DashboardHeaderState extends State<DashboardHeader> {
     // Keep the bag in sync with the current name (cheap after first call).
     _ensureBag(cleanFirstName);
 
-    final options = timeGreetingOptions(now);
-    final greeting = options.length == 1
-        ? options.first
-        : (_greetingVariant ? options[1] : options[0]);
+    final greeting = primaryGreeting(now);
 
     return RepaintBoundary(
       child: Container(
@@ -476,13 +473,9 @@ class _DashboardHeaderState extends State<DashboardHeader> {
                       child: Container(
                         width: 42,
                         height: 42,
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF262320),
-                          border: Border.all(
-                            color: const Color(0xFFE59435).withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
+                          color: Color(0xFF262320),
                         ),
                         alignment: Alignment.center,
                         clipBehavior: Clip.antiAlias,

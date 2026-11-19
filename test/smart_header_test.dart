@@ -92,45 +92,56 @@ void main() {
     });
   });
 
-  group('timeGreetingOptions', () {
-    test('morning bucket (5–10:59)', () {
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 5)),
-          ['Good morning', 'Ready to start your day?']);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 10, 59)),
-          ['Good morning', 'Ready to start your day?']);
+  group('Greeting buckets & boundary tests (Phase 1)', () {
+    test('timeBucketFor exact 24h boundaries', () {
+      // 04:59 -> night
+      expect(timeBucketFor(DateTime(2026, 11, 17, 4, 59)), TimeBucket.night);
+      // 05:00 -> morning
+      expect(timeBucketFor(DateTime(2026, 11, 17, 5, 0)), TimeBucket.morning);
+      // 11:59 -> morning
+      expect(timeBucketFor(DateTime(2026, 11, 17, 11, 59)), TimeBucket.morning);
+      // 12:00 -> afternoon
+      expect(timeBucketFor(DateTime(2026, 11, 17, 12, 0)), TimeBucket.afternoon);
+      // 16:59 -> afternoon
+      expect(timeBucketFor(DateTime(2026, 11, 17, 16, 59)), TimeBucket.afternoon);
+      // 17:00 -> evening
+      expect(timeBucketFor(DateTime(2026, 11, 17, 17, 0)), TimeBucket.evening);
+      // 20:59 -> evening
+      expect(timeBucketFor(DateTime(2026, 11, 17, 20, 59)), TimeBucket.evening);
+      // 21:00 -> night
+      expect(timeBucketFor(DateTime(2026, 11, 17, 21, 0)), TimeBucket.night);
+      // 23:59 -> night
+      expect(timeBucketFor(DateTime(2026, 11, 17, 23, 59)), TimeBucket.night);
+      // 00:00 -> night
+      expect(timeBucketFor(DateTime(2026, 11, 17, 0, 0)), TimeBucket.night);
     });
 
-    test('midday bucket (11–13:59)', () {
-      final expected = ['Good afternoon', "How's your day going?"];
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 11)), expected);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 13, 59)), expected);
+    test('primaryGreeting always provides real greeting for first 3 buckets', () {
+      expect(primaryGreeting(DateTime(2026, 11, 17, 5, 0)), 'Good morning');
+      expect(primaryGreeting(DateTime(2026, 11, 17, 11, 59)), 'Good morning');
+      expect(primaryGreeting(DateTime(2026, 11, 17, 12, 0)), 'Good afternoon');
+      expect(primaryGreeting(DateTime(2026, 11, 17, 16, 59)), 'Good afternoon');
+      expect(primaryGreeting(DateTime(2026, 11, 17, 17, 0)), 'Good evening');
+      expect(primaryGreeting(DateTime(2026, 11, 17, 20, 59)), 'Good evening');
+
+      // Night does not use "Good ..."
+      final night = primaryGreeting(DateTime(2026, 11, 17, 22, 0));
+      expect(night.startsWith('Good'), isFalse);
+      expect(night, 'Still at it?');
     });
 
-    test('afternoon bucket (14–16:59)', () {
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 14)),
-          ["How's the day treating you?"]);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 16, 59)),
-          ["How's the day treating you?"]);
-    });
-
-    test('evening bucket (17–20:59)', () {
-      final expected = ['Good evening', 'How did today go?'];
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 17)), expected);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 20, 59)), expected);
-    });
-
-    test('late night bucket (21–23:59)', () {
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 21)),
-          ['Still working on something?']);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 23, 59)),
-          ['Still working on something?']);
-    });
-
-    test('overnight bucket (00–04:59)', () {
-      expect(timeGreetingOptions(DateTime(2026, 11, 17)),
-          ['Burning the midnight oil?']);
-      expect(timeGreetingOptions(DateTime(2026, 11, 17, 4, 59)),
-          ['Burning the midnight oil?']);
+    test('secondary lines are separate and primary greeting is never replaced', () {
+      for (var h = 0; h < 24; h++) {
+        final dt = DateTime(2026, 11, 17, h, 30);
+        final primary = primaryGreeting(dt);
+        final secondaries = secondaryGreetingLines(dt);
+        expect(secondaries, isNotEmpty);
+        expect(secondaries.contains(primary), isFalse,
+            reason: 'secondary lines should be separate from primary');
+        final options = timeGreetingOptions(dt);
+        expect(options.first, equals(primary),
+            reason: 'first option must strictly be the primary greeting');
+      }
     });
 
     test('no time bucket produces the word "Hey"', () {

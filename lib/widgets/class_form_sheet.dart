@@ -49,6 +49,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   bool get _isEdit => widget.existing != null;
 
   final _nameCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
   Set<int> _days = {};
   late TimeOfDay _start;
   late TimeOfDay _end;
@@ -69,10 +70,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       _endTouched = true;
       _roomCtrl.text = e.room ?? '';
       _reminder = e.reminderMinutesBefore;
-      // Pre-fill the class name from its backing course.
+      // Pre-fill the class name and course code from its backing course.
       final routine = context.read<RoutineState>();
       final course = routine.courseById(e.courseId);
       _nameCtrl.text = course?.name ?? '';
+      _codeCtrl.text = course?.code ?? '';
     } else {
       _days = {widget.initialWeekday ?? DateTime.now().weekday};
       _start = const TimeOfDay(hour: 9, minute: 0);
@@ -83,6 +85,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _codeCtrl.dispose();
     _roomCtrl.dispose();
     super.dispose();
   }
@@ -174,12 +177,17 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   String _ensureCourseForName(
     RoutineState routine,
     String name, {
+    String? code,
     String? currentId,
   }) {
+    final cleanCode = (code != null && code.isNotEmpty) ? code : null;
     String? existing;
     for (final co in routine.courses) {
       if (co.name.trim().toLowerCase() == name.toLowerCase()) {
         existing = co.id;
+        if (cleanCode != null && co.code != cleanCode) {
+          routine.updateCourse(co.id, co.copyWith(code: cleanCode));
+        }
         break;
       }
     }
@@ -190,11 +198,18 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       final usedElsewhere = routine.slots
           .any((s) => s.courseId == currentId && s.id != widget.existing?.id);
       if (!usedElsewhere) {
-        routine.updateCourse(currentId!, current.copyWith(name: name));
+        routine.updateCourse(
+          currentId!,
+          current.copyWith(
+            name: name,
+            code: cleanCode,
+            clearCode: cleanCode == null,
+          ),
+        );
         return currentId;
       }
     }
-    final created = Course(name: name);
+    final created = Course(name: name, code: cleanCode);
     routine.addCourse(created);
     return created.id;
   }
@@ -214,6 +229,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       _error('End time must be after start time.');
       return;
     }
+    final code = _codeCtrl.text.trim();
     final room = _roomCtrl.text.trim();
 
     if (_isEdit) {
@@ -221,8 +237,12 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       final conflict = _findOverlap(
           routine.slots, day, _mins(_start), _mins(_end));
       if (conflict != null && !await _confirmOverlap(conflict)) return;
-      final courseId =
-          _ensureCourseForName(routine, name, currentId: widget.existing!.courseId);
+      final courseId = _ensureCourseForName(
+        routine,
+        name,
+        code: code,
+        currentId: widget.existing!.courseId,
+      );
       routine.updateSlot(
         widget.existing!.id,
         widget.existing!.copyWith(
@@ -242,7 +262,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
             routine.slots, day, _mins(_start), _mins(_end));
         if (conflict != null && !await _confirmOverlap(conflict)) return;
       }
-      final courseId = _ensureCourseForName(routine, name);
+      final courseId = _ensureCourseForName(routine, name, code: code);
       routine.addSlots(_days.map((day) => ClassSlot(
             courseId: courseId,
             weekday: day,
@@ -326,6 +346,35 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
               style: TextStyle(color: c.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'e.g. Mathematics',
+                hintStyle: TextStyle(color: c.textTertiary, fontSize: 14),
+                filled: true,
+                fillColor: c.inputBg,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.accent, width: 1.5),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            _label('COURSE CODE (OPTIONAL)', c),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _codeCtrl,
+              textCapitalization: TextCapitalization.characters,
+              style: TextStyle(color: c.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'e.g. MATH 101',
                 hintStyle: TextStyle(color: c.textTertiary, fontSize: 14),
                 filled: true,
                 fillColor: c.inputBg,

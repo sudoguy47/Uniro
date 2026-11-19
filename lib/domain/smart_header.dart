@@ -209,27 +209,85 @@ class ShuffleBag {
 
 // ── State A — time-based greeting buckets ───────────────────────────────────
 
-/// Options for the time bucket containing [now]. Time ranges (local):
-///   05:00–10:59  -> "Good morning" / "Ready to start your day?"
-///   11:00–13:59  -> "Good afternoon" / "How's your day going?"
-///   14:00–16:59  -> "How's the day treating you?"
-///   17:00–20:59  -> "Good evening" / "How did today go?"
-///   21:00–23:59  -> "Still working on something?"
-///   00:00–04:59  -> "Burning the midnight oil?"
-/// Buckets with two options alternate on consecutive State A passes.
-List<String> timeGreetingOptions(DateTime now) {
-  final h = now.hour;
-  if (h >= 5 && h < 11) {
-    return const ['Good morning', 'Ready to start your day?'];
-  }
-  if (h >= 11 && h < 14) {
-    return const ['Good afternoon', "How's your day going?"];
-  }
-  if (h >= 14 && h < 17) return const ["How's the day treating you?"];
-  if (h >= 17 && h < 21) return const ['Good evening', 'How did today go?'];
-  if (h >= 21) return const ['Still working on something?'];
-  return const ['Burning the midnight oil?'];
+enum TimeBucket {
+  morning,
+  afternoon,
+  evening,
+  night,
 }
+
+/// Computes the [TimeBucket] for [now] (24h local time):
+/// - 05:00–11:59 -> morning
+/// - 12:00–16:59 -> afternoon
+/// - 17:00–20:59 -> evening
+/// - 21:00–04:59 -> night
+TimeBucket timeBucketFor(DateTime now) {
+  final m = now.hour * 60 + now.minute;
+  if (m >= 5 * 60 && m < 12 * 60) return TimeBucket.morning;
+  if (m >= 12 * 60 && m < 17 * 60) return TimeBucket.afternoon;
+  if (m >= 17 * 60 && m < 21 * 60) return TimeBucket.evening;
+  return TimeBucket.night;
+}
+
+/// Primary greeting for the time bucket containing [now].
+/// Always present as a real greeting ("Good morning", "Good afternoon",
+/// "Good evening") for the first three buckets.
+/// Night uses a calm, night-specific line instead of "Good ...".
+String primaryGreeting(DateTime now) {
+  switch (timeBucketFor(now)) {
+    case TimeBucket.morning:
+      return 'Good morning';
+    case TimeBucket.afternoon:
+      return 'Good afternoon';
+    case TimeBucket.evening:
+      return 'Good evening';
+    case TimeBucket.night:
+      return 'Still at it?';
+  }
+}
+
+/// Optional secondary lines for the time bucket containing [now].
+/// Stored in a separate slot and never replaces the primary greeting.
+List<String> secondaryGreetingLines(DateTime now) {
+  switch (timeBucketFor(now)) {
+    case TimeBucket.morning:
+      return const [
+        'Ready to start your day?',
+        'Ready when you are.',
+        'A good time to plan the day.',
+        'Start with the smallest task.',
+        "Check today's classes first.",
+      ];
+    case TimeBucket.afternoon:
+      return const [
+        "Halfway through. How's it going?",
+        "Good time to review what's left.",
+        'One more focused session?',
+        "How's your day going?",
+      ];
+    case TimeBucket.evening:
+      return const [
+        'Wrapping up?',
+        'Anything to move to tomorrow?',
+        'Review today, then rest.',
+        'How did today go?',
+      ];
+    case TimeBucket.night:
+      return const [
+        'Save your notes and call it a night.',
+        "Tomorrow's list can wait.",
+        'Still working on something?',
+        'Burning the midnight oil?',
+      ];
+  }
+}
+
+/// Options for the time bucket containing [now].
+/// Index 0 is guaranteed to be the fixed [primaryGreeting].
+List<String> timeGreetingOptions(DateTime now) => [
+      primaryGreeting(now),
+      ...secondaryGreetingLines(now),
+    ];
 
 // ── Category 11 — live conditions ───────────────────────────────────────────
 
