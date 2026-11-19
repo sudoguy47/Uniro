@@ -8,6 +8,7 @@ import '../state/app_state.dart';
 import '../state/routine_state.dart';
 import '../theme/app_colors.dart';
 import 'battery_guide.dart';
+import 'app_notification.dart';
 import '../screens/routine_screen.dart' show courseWeekdayNames;
 
 /// Opens the add/edit class bottom sheet.
@@ -47,11 +48,7 @@ class ClassFormSheet extends StatefulWidget {
 class _ClassFormSheetState extends State<ClassFormSheet> {
   bool get _isEdit => widget.existing != null;
 
-  String? _courseId;
-  bool _showNewCourse = false;
-  final _cNameCtrl = TextEditingController();
-  int? _cColor;
-
+  final _nameCtrl = TextEditingController();
   Set<int> _days = {};
   late TimeOfDay _start;
   late TimeOfDay _end;
@@ -66,13 +63,16 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     super.initState();
     final e = widget.existing;
     if (e != null) {
-      _courseId = e.courseId;
       _days = {e.weekday};
       _start = TimeOfDay(hour: e.startMinutes ~/ 60, minute: e.startMinutes % 60);
       _end = TimeOfDay(hour: e.endMinutes ~/ 60, minute: e.endMinutes % 60);
       _endTouched = true;
       _roomCtrl.text = e.room ?? '';
       _reminder = e.reminderMinutesBefore;
+      // Pre-fill the class name from its backing course.
+      final routine = context.read<RoutineState>();
+      final course = routine.courseById(e.courseId);
+      _nameCtrl.text = course?.name ?? '';
     } else {
       _days = {widget.initialWeekday ?? DateTime.now().weekday};
       _start = const TimeOfDay(hour: 9, minute: 0);
@@ -82,7 +82,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
 
   @override
   void dispose() {
-    _cNameCtrl.dispose();
+    _nameCtrl.dispose();
     _roomCtrl.dispose();
     super.dispose();
   }
@@ -91,9 +91,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
 
   void _error(String msg) {
     PremiumHaptics.tap();
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+    AppNotification.warning(context, msg);
   }
 
   Future<void> _pickTime(bool isStart) async {
@@ -123,20 +121,6 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   TimeOfDay _plusMinutes(TimeOfDay t, int minutes) {
     final total = (t.hour * 60 + t.minute + minutes) % (24 * 60);
     return TimeOfDay(hour: total ~/ 60, minute: total % 60);
-  }
-
-  /// Creates the inline course (name + color only); null + error on
-  /// invalid input.
-  Course? _createInlineCourse() {
-    final name = _cNameCtrl.text.trim();
-    if (name.isEmpty) {
-      _error('Please enter a course name (or pick an existing course).');
-      return null;
-    }
-    return Course(
-      name: name,
-      colorTag: _cColor,
-    );
   }
 
   /// First overlapping existing slot description, or null.
@@ -183,18 +167,43 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     return save == true;
   }
 
+  /// Returns the course id to back [name]. Reuses a course with the same
+  /// name (case-insensitive), renames the current course when [currentId]
+  /// has no other slots, or creates a fresh one. Silent by design — the
+  /// name is the whole identity of a class in this sheet.
+  String _ensureCourseForName(
+    RoutineState routine,
+    String name, {
+    String? currentId,
+  }) {
+    String? existing;
+    for (final co in routine.courses) {
+      if (co.name.trim().toLowerCase() == name.toLowerCase()) {
+        existing = co.id;
+        break;
+      }
+    }
+    if (existing != null) return existing;
+
+    final current = currentId == null ? null : routine.courseById(currentId);
+    if (current != null) {
+      final usedElsewhere = routine.slots
+          .any((s) => s.courseId == currentId && s.id != widget.existing?.id);
+      if (!usedElsewhere) {
+        routine.updateCourse(currentId!, current.copyWith(name: name));
+        return currentId;
+      }
+    }
+    final created = Course(name: name);
+    routine.addCourse(created);
+    return created.id;
+  }
+
   Future<void> _save() async {
     final routine = context.read<RoutineState>();
-    var courseId = _courseId;
-    // Inline new course wins when its form is open with a name typed.
-    if (_showNewCourse && _cNameCtrl.text.trim().isNotEmpty) {
-      final created = _createInlineCourse();
-      if (created == null) return;
-      routine.addCourse(created);
-      courseId = created.id;
-    }
-    if (courseId == null) {
-      _error('Please pick a course first.');
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      _error('Please enter a class name.');
       return;
     }
     if (_days.isEmpty) {
@@ -206,11 +215,14 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
       return;
     }
     final room = _roomCtrl.text.trim();
+
     if (_isEdit) {
       final day = _days.first;
       final conflict = _findOverlap(
           routine.slots, day, _mins(_start), _mins(_end));
       if (conflict != null && !await _confirmOverlap(conflict)) return;
+      final courseId =
+          _ensureCourseForName(routine, name, currentId: widget.existing!.courseId);
       routine.updateSlot(
         widget.existing!.id,
         widget.existing!.copyWith(
@@ -230,8 +242,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
             routine.slots, day, _mins(_start), _mins(_end));
         if (conflict != null && !await _confirmOverlap(conflict)) return;
       }
+      final courseId = _ensureCourseForName(routine, name);
       routine.addSlots(_days.map((day) => ClassSlot(
-            courseId: courseId!,
+            courseId: courseId,
             weekday: day,
             startMinutes: _mins(_start),
             endMinutes: _mins(_end),
@@ -242,6 +255,11 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     if (!mounted) return;
     final enabled = context.read<AppState>().settings.notificationsEnabled;
     await NotificationService.instance.refreshClassReminders(
+      courses: routine.courses,
+      slots: routine.slots,
+      enabled: enabled,
+    );
+    await NotificationService.instance.refreshAttendancePrompts(
       courses: routine.courses,
       slots: routine.slots,
       enabled: enabled,
@@ -257,10 +275,6 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    final routine = context.watch<RoutineState>();
-    final selectedCourse = _courseId == null
-        ? null
-        : routine.courseById(_courseId!);
 
     return SafeArea(
       top: false,
@@ -284,20 +298,55 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
             Text(
               _isEdit ? 'Edit Class' : 'Add Class',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
                 color: c.textPrimary,
               ),
             ),
-            const SizedBox(height: 16),
-            _label('COURSE', c),
-            const SizedBox(height: 6),
-            _courseField(c, routine.courses, selectedCourse),
-            if (_showNewCourse) ...[
-              const SizedBox(height: 10),
-              _newCourseForm(c),
+            if (_isEdit)
+              const SizedBox(height: 2)
+            else ...[
+              const SizedBox(height: 2),
+              Text(
+                'One entry per class — pick every day it happens.',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: c.textTertiary,
+                ),
+              ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            _label('CLASS NAME', c),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _nameCtrl,
+              textCapitalization: TextCapitalization.words,
+              style: TextStyle(color: c.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'e.g. Mathematics',
+                hintStyle: TextStyle(color: c.textTertiary, fontSize: 14),
+                filled: true,
+                fillColor: c.inputBg,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.accent, width: 1.5),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
             _label(_isEdit ? 'DAY' : 'DAYS', c),
             const SizedBox(height: 8),
             Row(
@@ -326,7 +375,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                         color: active ? c.navActiveBg : c.inputBg,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: active ? c.navActiveBg : c.border,
+                          color: active ? c.navActiveBg : c.borderLight,
                         ),
                       ),
                       alignment: Alignment.center,
@@ -345,7 +394,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 );
               }),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
@@ -371,7 +420,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             _label('ROOM (OPTIONAL)', c),
             const SizedBox(height: 6),
             TextField(
@@ -385,44 +434,62 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                 fillColor: c.inputBg,
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.accent, width: 1.5),
+                ),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: c.borderLight),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             _label('REMINDER', c),
             const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: c.inputBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<int?>(
-                  value: _reminder,
-                  isExpanded: true,
-                  dropdownColor: c.cardBg,
-                  style: TextStyle(
-                      color: c.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15),
-                  items: _reminderOptions
-                      .map((v) => DropdownMenuItem<int?>(
-                            value: v,
-                            child: Text(v == null
-                                ? 'None'
-                                : '$v min before'),
-                          ))
-                      .toList(),
-                  onChanged: (v) {
-                    PremiumHaptics.select();
-                    setState(() => _reminder = v);
-                  },
-                ),
-              ),
+            Row(
+              children: _reminderOptions.map((v) {
+                final active = v == _reminder;
+                final label = v == null ? 'None' : '$v min';
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      PremiumHaptics.select();
+                      setState(() => _reminder = v);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      height: 36,
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: active ? c.navActiveBg : c.inputBg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: active ? c.navActiveBg : c.borderLight,
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight:
+                              active ? FontWeight.w700 : FontWeight.w500,
+                          color: active ? c.navActiveText : c.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -434,7 +501,7 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
                   foregroundColor: Colors.white,
                   backgroundColor: c.accent,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
                 child: Text(
@@ -450,186 +517,6 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     );
   }
 
-  Widget _courseField(
-      AppColors c, List<Course> courses, Course? selected) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () {
-            PremiumHaptics.select();
-            setState(() => _showNewCourse = !_showNewCourse);
-          },
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(
-              color: c.inputBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                if (selected?.colorTag != null)
-                  Container(
-                    width: 10,
-                    height: 10,
-                    margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(
-                      color: Color(selected!.colorTag!),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                Expanded(
-                  child: Text(
-                    selected == null
-                        ? 'Select course…'
-                        : ((selected.code ?? '').isNotEmpty
-                            ? '${selected.code} · ${selected.name}'
-                            : selected.name),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: selected == null
-                          ? c.textTertiary
-                          : c.textPrimary,
-                    ),
-                  ),
-                ),
-                Icon(
-                  _showNewCourse
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: c.textSecondary,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_showNewCourse) ...[
-          const SizedBox(height: 8),
-          ...courses.map((course) => ListTile(
-                dense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                leading: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: course.colorTag != null
-                        ? Color(course.colorTag!)
-                        : c.border,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                title: Text(
-                  (course.code ?? '').isNotEmpty
-                      ? '${course.code} · ${course.name}'
-                      : course.name,
-                  style: TextStyle(
-                    fontWeight:
-                        course.id == _courseId ? FontWeight.bold : FontWeight.normal,
-                    color: course.id == _courseId
-                        ? c.accent
-                        : c.textPrimary,
-                  ),
-                ),
-                trailing: course.id == _courseId
-                    ? Icon(Icons.check, color: c.accent)
-                    : null,
-                onTap: () => setState(() => _courseId = course.id),
-              )),
-        ],
-      ],
-    );
-  }
-
-  Widget _newCourseForm(AppColors c) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: c.inputBg.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.add, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'New course',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: c.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _miniField(_cNameCtrl, 'Course name * (e.g. EEE141.8)', c),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            children: Course.palette.map((col) {
-              final active = _cColor == col;
-              return GestureDetector(
-                onTap: () => setState(() => _cColor = col),
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: Color(col),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: active ? c.textPrimary : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: active
-                      ? const Icon(Icons.check,
-                          size: 14, color: Colors.white)
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Saved with the class when you tap "${_isEdit ? 'Save Changes' : 'Add Class'}".',
-            style: TextStyle(fontSize: 12, color: c.textTertiary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _miniField(
-      TextEditingController ctrl, String hint, AppColors c) {
-    return TextField(
-      controller: ctrl,
-      textCapitalization: TextCapitalization.words,
-      keyboardType: hint == 'Credits'
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.text,
-      style: TextStyle(color: c.textPrimary, fontSize: 14),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: c.textTertiary, fontSize: 13),
-        filled: true,
-        fillColor: c.cardBg,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
   Widget _timeBox(AppColors c, TimeOfDay t, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -638,7 +525,8 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: c.inputBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: c.borderLight),
         ),
         child: Row(
           children: [
@@ -659,9 +547,9 @@ class _ClassFormSheetState extends State<ClassFormSheet> {
     return Text(
       text,
       style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.0,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.4,
         color: c.textTertiary,
       ),
     );

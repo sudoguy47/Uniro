@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/logger.dart';
 import '../models/note.dart';
+import 'error_log.dart';
+import 'note_security_service.dart';
 
 const _kNotesKey = 'uniro_notes_v1';
 const _kFoldersKey = 'uniro_note_folders_v1';
@@ -23,8 +26,41 @@ class NotesStore {
     if (raw == null || raw.isEmpty) return;
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      _notes = list.map((e) => Note.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
+      final parsed = <Note>[];
+      for (final e in list) {
+        try {
+          if (e is Map<String, dynamic>) {
+            parsed.add(Note.fromJson(e));
+          } else if (e is Map) {
+            parsed.add(Note.fromJson(Map<String, dynamic>.from(e)));
+          }
+        } catch (err, st) {
+          ErrorLog.record(err, st, 'load_notes');
+        }
+      }
+      bool needsSave = false;
+      for (var i = 0; i < parsed.length; i++) {
+        final n = parsed[i];
+        if (n.isLocked && n.encryptedPayload == null && n.blocks.isNotEmpty) {
+          try {
+            final encrypted =
+                await NoteSecurityService.instance.encryptBlocks(n.blocks);
+            parsed[i] = n.copyWith(
+              encryptedPayload: encrypted,
+              blocks: const [],
+            );
+            needsSave = true;
+          } catch (e, st) {
+            AppLog.e('Failed to encrypt legacy locked note ${n.id}', e, st);
+          }
+        }
+      }
+      _notes = parsed;
+      if (needsSave) {
+        await _flushNotes();
+      }
+    } catch (e, st) {
+      ErrorLog.record(e, st, 'load_notes_json');
       _notes = [];
     }
   }

@@ -59,9 +59,33 @@ String urgencyLabel(TaskUrgency u) => switch (u) {
       TaskUrgency.completed => 'Completed',
     };
 
+/// Formats predefined task types according to app conventions.
+String formatPredefinedTaskType(TaskType t) => switch (t) {
+      TaskType.assignment => 'Assignment',
+      TaskType.exam => 'Exam',
+      TaskType.ct => 'Class Test (CT)',
+      TaskType.viva => 'Viva',
+      TaskType.presentation => 'Presentation',
+      TaskType.lab => 'Lab',
+      TaskType.project => 'Project',
+      TaskType.other => 'Other',
+      TaskType.custom => 'Custom',
+    };
+
+/// Returns the display label for a task's category, taking into account any custom name.
+String taskCategoryLabel(Task task) {
+  if (task.type == TaskType.custom) {
+    final custom = task.customCategory?.trim();
+    if (custom != null && custom.isNotEmpty) {
+      return custom;
+    }
+    return 'Custom';
+  }
+  return formatPredefinedTaskType(task.type);
+}
+
 String subtitleText(Task task, [TaskUrgency? precomputedUrgency]) {
-  final typeName =
-      task.type.name[0].toUpperCase() + task.type.name.substring(1);
+  final typeName = taskCategoryLabel(task);
   final u = precomputedUrgency ?? getUrgency(task);
   return '$typeName \u00b7 ${urgencyLabel(u)}';
 }

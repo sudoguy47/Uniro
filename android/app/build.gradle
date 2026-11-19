@@ -21,7 +21,16 @@ if (keystorePropertiesFile.exists()) {
             "android/key.properties is missing '${missingKey}'. " +
             "See android/KEYSTORE.md — and never commit this file.")
     }
-    def configuredStore = file(keystoreProperties['storeFile'])
+    def storeFilePath = keystoreProperties['storeFile']
+    def configuredStore = file(storeFilePath)
+    if (!configuredStore.isFile() && storeFilePath.startsWith("C:/Users/sudog/")) {
+        def linuxPath = "/media/sudoguy/D85E92735E9249E0/Users/sudog/" + storeFilePath.substring("C:/Users/sudog/".length())
+        def linuxStore = file(linuxPath)
+        if (linuxStore.isFile()) {
+            configuredStore = linuxStore
+            keystoreProperties['storeFile'] = linuxPath
+        }
+    }
     if (!configuredStore.isFile()) {
         throw new GradleException(
             "Release keystore not found at '${keystoreProperties['storeFile']}' " +
@@ -32,7 +41,9 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace "dev.sudoguy.uniro"
-    compileSdk flutter.compileSdkVersion
+    // A newer compileSdk is required by flutter_plugin_android_lifecycle
+    // (android-36+). Deliberately NOT changing minSdk / targetSdk.
+    compileSdk 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {

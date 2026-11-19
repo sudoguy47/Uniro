@@ -4,7 +4,9 @@ import '../../domain/haptics.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../models/note.dart';
+import '../../services/note_security_service.dart';
 import '../../state/notes_state.dart';
+import '../app_notification.dart';
 
 class NoteCard extends StatefulWidget {
   const NoteCard({
@@ -117,9 +119,25 @@ class _NoteCardState extends State<NoteCard>
                 note.isLocked ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
               ),
               title: Text(note.isLocked ? 'Unlock Note' : 'Lock Note'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(sheetCtx);
-                context.read<NotesState>().toggleLock(note.id);
+                final success = await context.read<NotesState>().toggleLock(note.id);
+                if (!mounted) return;
+                if (!success) {
+                  final canAuth = await NoteSecurityService.instance.canAuthenticate();
+                  if (!mounted) return;
+                  if (!canAuth) {
+                    AppNotification.show(
+                      context,
+                      message: 'To lock notes, please set up a screen lock (PIN, pattern, or biometrics) in device settings.',
+                    );
+                  } else {
+                    AppNotification.show(
+                      context,
+                      message: 'Authentication failed or cancelled.',
+                    );
+                  }
+                }
               },
             ),
             ListTile(

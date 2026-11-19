@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/support_links.dart';
 import '../theme/app_colors.dart';
+import 'app_notification.dart';
 
 bool _dialogOpen = false;
 
@@ -40,9 +41,7 @@ class _SupportDialogBody extends StatelessWidget {
     }
     if (!context.mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Couldn't open the link.")),
-      );
+      AppNotification.error(context, "Couldn't open the link.");
     }
   }
 

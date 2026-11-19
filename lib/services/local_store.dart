@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/logger.dart';
 
 class LocalStore {
   static LocalStore? _instance;
@@ -26,7 +26,7 @@ class LocalStore {
       _prefs = await SharedPreferences.getInstance();
       await ensureSchema();
     } catch (e) {
-      debugPrint('LocalStore init notice: $e');
+      AppLog.w('LocalStore init notice', e);
     }
   }
 
@@ -44,20 +44,20 @@ class LocalStore {
         await _prefs?.setInt(_schemaKey, schemaVersion);
       }
     } catch (e) {
-      debugPrint('LocalStore schema notice: $e');
+      AppLog.w('LocalStore schema notice', e);
     }
   }
 
   /// Migration hook. Intentionally a no-op for schema v1.
   Future<void> migrateSchema(int from, int to) async {
-    debugPrint('LocalStore migrateSchema $from -> $to (no-op)');
+    AppLog.d('LocalStore migrateSchema $from -> $to (no-op)');
   }
 
   void save(String key, dynamic data) {
     try {
       _prefs?.setString('ct_$key', jsonEncode(data));
     } catch (e) {
-      debugPrint('LocalStore save notice ($key): $e');
+      AppLog.w('LocalStore save notice ($key)', e);
     }
   }
 
@@ -65,7 +65,7 @@ class LocalStore {
     try {
       await _prefs?.remove('ct_$key');
     } catch (e) {
-      debugPrint('LocalStore remove notice ($key): $e');
+      AppLog.w('LocalStore remove notice ($key)', e);
     }
   }
 
@@ -83,7 +83,7 @@ class LocalStore {
         return null;
       }
     } catch (e) {
-      debugPrint('LocalStore load notice ($key): $e');
+      AppLog.w('LocalStore load notice ($key)', e);
       return null;
     }
   }
@@ -93,10 +93,10 @@ class LocalStore {
       _prefs?.setString('ct_$key.corrupt', raw);
       _prefs?.remove('ct_$key');
     } catch (e) {
-      debugPrint('LocalStore backup notice ($key): $e');
+      AppLog.w('LocalStore backup notice ($key)', e);
     }
     _recovered = true;
-    debugPrint('LocalStore: corrupt "$key" backed up to "$key.corrupt"');
+    AppLog.w('LocalStore: corrupt "$key" backed up to "$key.corrupt"');
   }
 
   bool get isOnboardingDone {

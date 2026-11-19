@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/note.dart';
+import '../../services/note_security_service.dart';
 import '../../state/notes_state.dart';
+import '../../widgets/app_notification.dart';
 import '../../widgets/notes/formatting_sheet.dart';
 
 class NoteEditorScreen extends StatefulWidget {
-  const NoteEditorScreen({super.key, required this.noteId});
+  const NoteEditorScreen({super.key, required this.noteId, this.initialNote});
   final String noteId;
+  final Note? initialNote;
 
   @override
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
@@ -26,15 +29,19 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   void initState() {
     super.initState();
-    final ns = context.read<NotesState>();
-    _note = ns.allNotes.firstWhere(
-      (n) => n.id == widget.noteId,
-      orElse: () => Note(
-        id: widget.noteId,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-    );
+    if (widget.initialNote != null) {
+      _note = widget.initialNote!;
+    } else {
+      final ns = context.read<NotesState>();
+      _note = ns.allNotes.firstWhere(
+        (n) => n.id == widget.noteId,
+        orElse: () => Note(
+          id: widget.noteId,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+    }
     _isPinned = _note.isPinned;
     _titleController.text = _note.title;
     _rebuildControllers();
@@ -53,10 +60,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     for (final block in _note.blocks) {
       final ctrl = TextEditingController(text: block.text);
       final focus = FocusNode();
-      final idx = _blockControllers.length;
       focus.addListener(() {
-        if (focus.hasFocus) {
-          setState(() => _focusedBlockIndex = idx);
+        if (focus.hasFocus && mounted) {
+          final curIdx = _blockFocuses.indexOf(focus);
+          if (curIdx != -1) {
+            setState(() => _focusedBlockIndex = curIdx);
+          }
         }
       });
       _blockControllers.add(ctrl);
@@ -115,7 +124,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final insertIdx = afterIndex + 1;
     newFocus.addListener(() {
       if (newFocus.hasFocus && mounted) {
-        setState(() => _focusedBlockIndex = insertIdx);
+        final curIdx = _blockFocuses.indexOf(newFocus);
+        if (curIdx != -1) {
+          setState(() => _focusedBlockIndex = curIdx);
+        }
       }
     });
 
@@ -162,6 +174,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       _focusedBlockIndex = targetIndex;
     });
 
+    if (oldFocus != null) {
+      oldFocus.unfocus();
+    }
+
     Future.microtask(() {
       oldCtrl?.dispose();
       oldFocus?.dispose();
@@ -169,7 +185,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _setBlockType(int index, BlockType newType) {
-    if (index >= _note.blocks.length) return;
+    if (index < 0 || index >= _note.blocks.length) return;
     final b = _note.blocks[index];
     final updated = b.copyWith(type: newType, checked: false);
     final newBlocks = List<NoteBlock>.of(_note.blocks)..[index] = updated;
@@ -179,8 +195,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _toggleBlockType(BlockType type) {
     final i = _focusedBlockIndex;
-    if (i >= _note.blocks.length) {
-      _addBlockAt(_note.blocks.length - 1, type);
+    if (i < 0 || i >= _note.blocks.length) {
+      if (_note.blocks.isNotEmpty) {
+        _addBlockAt(_note.blocks.length - 1, type);
+      }
       return;
     }
     final current = _note.blocks[i];
@@ -192,7 +210,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _handleBackspaceEmpty(int index) {
-    if (index >= _note.blocks.length) return;
+    if (index < 0 || index >= _note.blocks.length) return;
     final b = _note.blocks[index];
     if (b.type == BlockType.checklist || b.type == BlockType.quote) {
       _setBlockType(index, BlockType.paragraph);
@@ -204,8 +222,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _handleRemoveChecklist(int index) {
-    if (index >= _note.blocks.length) return;
-    final text = _blockControllers[index].text.trim();
+    if (index < 0 || index >= _note.blocks.length) return;
+    final text = (index < _blockControllers.length)
+        ? _blockControllers[index].text.trim()
+        : '';
     if (text.isEmpty && _note.blocks.length > 1) {
       _removeBlockAt(index);
     } else {
@@ -214,6 +234,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   void _toggleCheck(int index) {
+    if (index < 0 || index >= _note.blocks.length) return;
     final b = _note.blocks[index];
     final newBlocks = List<NoteBlock>.of(_note.blocks)..[index] = b.copyWith(checked: !b.checked);
     setState(() => _note = _note.copyWith(blocks: newBlocks));
@@ -222,7 +243,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
   void _applyStyle(NoteBlockStyle Function(NoteBlockStyle) fn) {
     final i = _focusedBlockIndex;
-    if (i >= _note.blocks.length) return;
+    if (i < 0 || i >= _note.blocks.length) return;
     final newBlock = _note.blocks[i].copyWith(style: fn(_note.blocks[i].style));
     final newBlocks = List<NoteBlock>.of(_note.blocks)..[i] = newBlock;
     setState(() => _note = _note.copyWith(blocks: newBlocks));
@@ -298,10 +319,40 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ListTile(
               leading: Icon(_note.isLocked ? Icons.lock_open : Icons.lock_outline),
               title: Text(_note.isLocked ? 'Unlock Note' : 'Lock Note'),
-              onTap: () {
-                setState(() => _note = _note.copyWith(isLocked: !_note.isLocked));
-                context.read<NotesState>().toggleLock(_note.id);
+              onTap: () async {
                 Navigator.pop(sheetCtx);
+                final currentBlocks = _buildNote().blocks;
+                final success = await context.read<NotesState>().toggleLock(
+                  _note.id,
+                  activeBlocks: currentBlocks,
+                );
+                if (!mounted) return;
+                if (!success) {
+                  final canAuth = await NoteSecurityService.instance.canAuthenticate();
+                  if (!mounted) return;
+                  if (!canAuth) {
+                    AppNotification.show(
+                      context,
+                      message: 'To lock notes, please set up a screen lock (PIN, pattern, or biometrics) in device settings.',
+                    );
+                  } else {
+                    AppNotification.show(
+                      context,
+                      message: 'Authentication failed or cancelled.',
+                    );
+                  }
+                } else {
+                  final updatedNote = context
+                      .read<NotesState>()
+                      .allNotes
+                      .firstWhere((n) => n.id == _note.id);
+                  setState(() {
+                    _note = _note.copyWith(
+                      isLocked: updatedNote.isLocked,
+                      encryptedPayload: updatedNote.encryptedPayload,
+                    );
+                  });
+                }
               },
             ),
             ListTile(
@@ -385,7 +436,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final focusedBlock = _focusedBlockIndex < _note.blocks.length
+    final focusedBlock = (_focusedBlockIndex >= 0 &&
+            _focusedBlockIndex < _note.blocks.length)
         ? _note.blocks[_focusedBlockIndex]
         : null;
 
@@ -465,7 +517,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             ),
             _FormattingBar(
               onOpenSheet: () {
-                final block = _focusedBlockIndex < _note.blocks.length
+                final block = (_focusedBlockIndex >= 0 &&
+                        _focusedBlockIndex < _note.blocks.length)
                     ? _note.blocks[_focusedBlockIndex]
                     : null;
                 showModalBottomSheet<void>(

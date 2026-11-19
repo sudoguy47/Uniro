@@ -35,6 +35,14 @@ class AppTheme {
           side: BorderSide(color: c.border),
         ),
       ),
+
+      // ── Floating SnackBar ──
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: EdgeInsets.symmetric(horizontal: 16),
+      ),
     );
   }
 

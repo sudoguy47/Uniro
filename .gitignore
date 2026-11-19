@@ -65,3 +65,12 @@ public/fonts/imported/*
 !ios/Runner/Assets.xcassets/**
 !web/**
 !ss/**
+
+# Temporary test and emulator scratch files
+responsive_slice*.txt
+test_out.json
+prefs.xml
+.agents/
+.keep
+app icon/
+

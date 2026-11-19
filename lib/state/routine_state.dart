@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../models/class_slot.dart';
 import '../models/course.dart';
 import '../services/local_store.dart';
+import '../services/error_log.dart';
 
 /// Courses + weekly class slots (Routine tab). Mirrors the NotesState
 /// pattern: own in-RAM lists, 400ms debounced writes, only-dirty-keys
 /// persistence, loaded before the first frame in main.dart.
 class RoutineState extends ChangeNotifier {
+  static const _widgetChannel = MethodChannel('dev.sudoguy.uniro/widget');
+
   RoutineState() {
     _courses = [];
     _slots = [];
@@ -47,7 +51,8 @@ class RoutineState extends ChangeNotifier {
             } else {
               LocalStore.instance.markRecovery();
             }
-          } catch (_) {
+          } catch (e, st) {
+            ErrorLog.record(e, st, 'load_courses');
             LocalStore.instance.markRecovery();
             continue;
           }
@@ -64,7 +69,8 @@ class RoutineState extends ChangeNotifier {
             } else {
               LocalStore.instance.markRecovery();
             }
-          } catch (_) {
+          } catch (e, st) {
+            ErrorLog.record(e, st, 'load_slots');
             LocalStore.instance.markRecovery();
             continue;
           }
@@ -209,6 +215,7 @@ class RoutineState extends ChangeNotifier {
     LocalStore.instance
         .save('courses', _courses.map((c) => c.toJson()).toList());
     LocalStore.instance.save('slots', _slots.map((s) => s.toJson()).toList());
+    _widgetChannel.invokeMethod('updateWidget').catchError((_) {});
   }
 
   void persistNow() => _persistNow();

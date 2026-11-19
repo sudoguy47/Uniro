@@ -76,11 +76,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            <!-- CampusTracker Android Home Screen Widget (Weekly Load) -->
+            <!-- UniRo Android Home Screen Widget (Weekly Schedule) -->
         <receiver
             android:name=".CampusWidgetProvider"
             android:exported="true"
-            android:label="CampusTracker Weekly Load">
+            android:label="UniRo Weekly Schedule">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -88,11 +88,11 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/campus_widget_info" />
         </receiver>
-            <!-- CampusTracker Android Home Screen Widget (Monthly Heatmap Overview) -->
+            <!-- UniRo Android Home Screen Widget (Monthly Heatmap Overview) -->
         <receiver
             android:name=".CampusMonthWidgetProvider"
             android:exported="true"
-            android:label="CampusTracker Monthly Heatmap">
+            android:label="UniRo Monthly Heatmap">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

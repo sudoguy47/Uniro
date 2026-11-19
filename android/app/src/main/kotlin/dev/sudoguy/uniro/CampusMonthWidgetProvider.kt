@@ -59,14 +59,14 @@ class CampusMonthWidgetProvider : AppWidgetProvider() {
                 val array = JSONArray(rawTasks)
                 for (i in 0 until array.length()) {
                     val task = array.getJSONObject(i)
-                    val dueDate = task.optString("dueDate")
-                    val status = task.optString("status")
+                    val dueDate = optCleanString(task, "dueDate")
+                    val status = optCleanString(task, "status")
 
                     if (status != "completed") {
                         pendingList.add(task)
                     }
 
-                    if (dueDate.isNotBlank()) {
+                    if (!dueDate.isNullOrBlank()) {
                         tasksByDate.getOrPut(dueDate) { mutableListOf() }.add(task)
                         if (status == "completed") {
                             completedDates.add(dueDate)
@@ -82,7 +82,7 @@ class CampusMonthWidgetProvider : AppWidgetProvider() {
                 }
             }
 
-            pendingList.sortBy { it.optString("dueDate", "9999-99-99") }
+            pendingList.sortBy { optCleanString(it, "dueDate") ?: "9999-99-99" }
 
             // Month Header (e.g. "SEP 2026")
             val monthHeaderFmt = SimpleDateFormat("MMM yyyy", Locale.US)
@@ -128,13 +128,13 @@ class CampusMonthWidgetProvider : AppWidgetProvider() {
             }
 
             // Highlight next upcoming task or month summary
-            val upcomingTasks = pendingList.filter { it.optString("dueDate") >= todayDateStr }
+            val upcomingTasks = pendingList.filter { (optCleanString(it, "dueDate") ?: "") >= todayDateStr }
             val nextTask = if (upcomingTasks.isNotEmpty()) upcomingTasks[0] else if (pendingList.isNotEmpty()) pendingList[0] else null
 
             if (nextTask != null) {
-                val title = nextTask.optString("title", "Upcoming Task")
-                val type = formatType(nextTask.optString("type"))
-                val due = formatDue(nextTask.optString("dueDate"), todayDateStr, tomorrowDateStr)
+                val title = optCleanString(nextTask, "title") ?: "Upcoming Task"
+                val type = formatType(optCleanString(nextTask, "type") ?: "")
+                val due = formatDue(optCleanString(nextTask, "dueDate") ?: "", todayDateStr, tomorrowDateStr)
                 views.setTextViewText(R.id.widget_month_task_title, title)
                 views.setTextViewText(R.id.widget_month_task_meta, "$type • $due • $monthPendingCount due this month")
             } else {
@@ -305,6 +305,12 @@ class CampusMonthWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
+        fun optCleanString(obj: JSONObject, key: String, fallback: String? = null): String? {
+            if (!obj.has(key) || obj.isNull(key)) return fallback
+            val raw = obj.optString(key, fallback ?: "").trim()
+            return if (raw.isEmpty() || raw.equals("null", ignoreCase = true)) fallback else raw
+        }
+
         fun updateAllWidgets(context: Context) {
             try {
                 val appWidgetManager = AppWidgetManager.getInstance(context)

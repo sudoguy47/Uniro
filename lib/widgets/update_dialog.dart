@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/logger.dart';
 import '../services/device_channel.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
@@ -85,7 +86,7 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
         _apk = file;
         _phase = _Phase.verifying;
       });
-      final readiness = await checkInstallReadiness(file);
+      final readiness = await checkInstallReadiness(file, update: _update);
       if (!mounted) return;
       if (!readiness.ok) {
         setState(() {
@@ -134,8 +135,8 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
         Uri.parse(_update.apkUrl),
         mode: LaunchMode.externalApplication,
       );
-    } catch (e) {
-      debugPrint('open apk link notice: $e');
+    } catch (e, st) {
+      AppLog.w('open apk link notice: $e', e, st);
     }
   }
 
@@ -315,7 +316,7 @@ class _UpdateDialogBodyState extends State<_UpdateDialogBody> {
       _error = '';
     });
     try {
-      final readiness = await checkInstallReadiness(file);
+      final readiness = await checkInstallReadiness(file, update: _update);
       if (!mounted) return;
       if (!readiness.ok) {
         setState(() {

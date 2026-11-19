@@ -279,13 +279,16 @@ class _StepperControlState extends State<StepperControl>
           scale: _scaleCtrl,
           child: SizedBox(
             width: 32,
-            child: Text(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
               '${widget.value}',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: c.textPrimary),
+              ),
             ),
           ),
         ),
@@ -332,41 +335,48 @@ class PrioritySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = Theme.of(context).extension<AppColors>()!;
-    return Row(
-      children: TaskPriority.values.map((p) {
-        final active = p == value;
-        final label = p.name[0].toUpperCase() + p.name.substring(1);
-        return Expanded(
-          child: GestureDetector(
-            onTap: () {
-              PremiumHaptics.select();
-              onChange(p);
-            },
-            child: AnimatedContainer(
-              duration: AppTheme.fast,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              height: 44,
-              decoration: BoxDecoration(
-                color: active ? c.accentLight : c.cardBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: active ? c.accent : c.border,
-                  width: active ? 2 : 1,
+    // Segmented track (matches the App Theme control): selected cell uses
+    // the high-contrast inverse chip, not tinted orange.
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: c.inputBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: TaskPriority.values.map((p) {
+          final active = p == value;
+          final label = p.name[0].toUpperCase() + p.name.substring(1);
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                PremiumHaptics.select();
+                onChange(p);
+              },
+              behavior: HitTestBehavior.opaque,
+              child: AnimatedContainer(
+                duration: AppTheme.fast,
+                curve: Curves.easeOutCubic,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: active ? c.navActiveBg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9),
                 ),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: active ? c.accent : c.textSecondary,
+                alignment: Alignment.center,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    color: active ? c.navActiveText : c.textSecondary,
+                    letterSpacing: 0.1,
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 }

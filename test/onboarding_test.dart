@@ -66,8 +66,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(TextField), findsOneWidget);
       expect(find.text('Please enter your name to continue.'), findsOneWidget);
-      // Let the hint dismiss, then a name lets the user through.
-      await tester.pump(const Duration(seconds: 3));
+      // Dismiss the notification and pump through the timer and dismiss animation.
+      ScaffoldMessenger.of(tester.element(find.byType(OnboardingScreen)))
+          .hideCurrentSnackBar();
+      await tester.pump(const Duration(milliseconds: 3500));
+      await tester.pump(const Duration(milliseconds: 500));
       await tester.enterText(find.byType(TextField), 'Sreyas');
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.text('Sreyas'), findsOneWidget);

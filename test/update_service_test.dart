@@ -139,6 +139,127 @@ void main() {
           await checkForUpdate(client: client, installedOverride: '1.0.1'),
           isNull);
     });
+    test('force check throws friendly UpdateException on 403/429 rate limit',
+        () async {
+      final client403 =
+          MockClient((_) async => http.Response('{"message":"rate limit"}', 403));
+      expect(
+        () => checkForUpdate(
+            force: true, client: client403, installedOverride: '1.0.1'),
+        throwsA(isA<UpdateException>().having((e) => e.message, 'message',
+            contains('rate-limited'))),
+      );
+
+      final client429 =
+          MockClient((_) async => http.Response('{"message":"too many"}', 429));
+      expect(
+        () => checkForUpdate(
+            force: true, client: client429, installedOverride: '1.0.1'),
+        throwsA(isA<UpdateException>().having((e) => e.message, 'message',
+            contains('rate-limited'))),
+      );
+    });
+  });
+
+  group('SHA-256 extraction and verification', () {
+    test('extracts sha256 from release body', () {
+      const hash =
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      final u = parseUpdateResponse(
+        release(
+          tag: 'v1.0.2',
+          body: 'New features!\nSHA-256: $hash\nEnjoy!',
+        ),
+        installed: '1.0.1',
+      );
+      expect(u, isNotNull);
+      expect(u!.sha256, hash);
+    });
+
+    test('extracts sha256 asset url from assets list', () {
+      final u = parseUpdateResponse(
+        release(
+          tag: 'v1.0.2',
+          assets: [
+            {
+              'name': 'Uniro-1.0.2.apk',
+              'browser_download_url': 'https://x/app.apk'
+            },
+            {
+              'name': 'Uniro-1.0.2.apk.sha256',
+              'browser_download_url': 'https://x/app.apk.sha256'
+            },
+          ],
+        ),
+        installed: '1.0.1',
+      );
+      expect(u, isNotNull);
+      expect(u!.sha256AssetUrl, 'https://x/app.apk.sha256');
+    });
+
+    test('verifyApkChecksum matches valid hash', () async {
+      final tempDir = await Directory.systemTemp.createTemp('uniro_test_');
+      final apkFile = File('${tempDir.path}/test.apk');
+      await apkFile.writeAsBytes(utf8.encode('hello world'));
+      // sha256('hello world') = b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+      const expectedHash =
+          'b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9';
+
+      const update = AppUpdate(
+        tag: 'v1.0.2',
+        version: '1.0.2',
+        notes: '',
+        apkUrl: 'https://x/app.apk',
+        sha256: expectedHash,
+      );
+
+      final result = await verifyApkChecksum(apkFile, update);
+      expect(result.ok, isTrue);
+      expect(await apkFile.exists(), isTrue);
+      await tempDir.delete(recursive: true);
+    });
+
+    test('verifyApkChecksum deletes file and rejects invalid hash', () async {
+      final tempDir = await Directory.systemTemp.createTemp('uniro_test_');
+      final apkFile = File('${tempDir.path}/test.apk');
+      await apkFile.writeAsBytes(utf8.encode('tampered data'));
+      const wrongHash =
+          '0000000000000000000000000000000000000000000000000000000000000000';
+
+      const update = AppUpdate(
+        tag: 'v1.0.2',
+        version: '1.0.2',
+        notes: '',
+        apkUrl: 'https://x/app.apk',
+        sha256: wrongHash,
+      );
+
+      final result = await verifyApkChecksum(apkFile, update);
+      expect(result.ok, isFalse);
+      expect(result.reason, contains('checksum mismatch'));
+      expect(await apkFile.exists(), isFalse); // Corrupted file deleted!
+      await tempDir.delete(recursive: true);
+    });
+
+    test(
+        'verifyApkChecksum succeeds with log fallback when no checksum provided',
+        () async {
+      final tempDir = await Directory.systemTemp.createTemp('uniro_test_');
+      final apkFile = File('${tempDir.path}/test.apk');
+      await apkFile.writeAsBytes(utf8.encode('regular apk data'));
+
+      const update = AppUpdate(
+        tag: 'v1.0.2',
+        version: '1.0.2',
+        notes: 'Release notes with no hash',
+        apkUrl: 'https://x/app.apk',
+      );
+
+      final result = await verifyApkChecksum(apkFile, update);
+      expect(result.ok, isTrue);
+      expect(await apkFile.exists(), isTrue);
+      await tempDir.delete(recursive: true);
+    });
   });
 
   group('downloadUpdate with mocked HTTP', () {

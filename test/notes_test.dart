@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uniro1/models/note.dart';
+import 'package:uniro1/services/note_security_service.dart';
 import 'package:uniro1/services/notes_store.dart';
 import 'package:uniro1/state/notes_state.dart';
 
@@ -9,6 +10,7 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    NoteSecurityService.instance = NoteSecurityService.test(canAuth: true);
   });
 
   group('Note Model', () {
@@ -87,7 +89,7 @@ void main() {
       expect(state.pinnedNotes.length, 1);
 
       // Toggle lock
-      state.toggleLock(note.id);
+      await state.toggleLock(note.id);
       expect(state.allNotes.first.isLocked, true);
 
       // Delete note

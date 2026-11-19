@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/logger.dart';
 
 /// Local-only crash/error ring buffer. No network, no analytics.
 ///
@@ -73,7 +74,7 @@ class ErrorLog {
       }
       _loaded = true;
     } catch (e) {
-      debugPrint('ErrorLog init notice: $e');
+      AppLog.d('ErrorLog init notice: $e');
     }
   }
 
@@ -117,7 +118,7 @@ class ErrorLog {
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs?.setString(_prefsKey, jsonEncode(_entries));
     } catch (e) {
-      debugPrint('ErrorLog persist notice: $e');
+      AppLog.d('ErrorLog persist notice: $e');
     }
   }
 
@@ -127,7 +128,7 @@ class ErrorLog {
       _prefs ??= await SharedPreferences.getInstance();
       await _prefs?.remove(_prefsKey);
     } catch (e) {
-      debugPrint('ErrorLog clear notice: $e');
+      AppLog.d('ErrorLog clear notice: $e');
     }
   }
 

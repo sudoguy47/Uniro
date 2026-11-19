@@ -27,9 +27,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
-            android:text="CampusTracker"
+            android:text="UniRo"
             android:textColor="#E8963C"
-            android:textSize="10.5sp"
+            android:textSize="11sp"
             android:textStyle="bold" />
 
         <FrameLayout
@@ -50,11 +50,63 @@
     <ImageView
         android:id="@+id/widget_chart_image"
         android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_marginTop="6dp"
+        android:layout_height="72dp"
+        android:layout_marginTop="4dp"
         android:layout_marginBottom="6dp"
         android:scaleType="fitXY"
         android:contentDescription="Weekly Load Chart" />
+
+    <!-- Upcoming Class Highlight Card -->
+    <LinearLayout
+        android:id="@+id/widget_class_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/widget_task_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="5dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/widget_class_accent_indicator"
+            android:layout_width="3dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/widget_class_accent_bar"
+            android:contentDescription="Class Accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_class_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Next Class"
+                android:textColor="#FFFFFF"
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_class_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Time • Room"
+                android:textColor="#E8963C"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!-- Upcoming Task Highlight Card -->
     <LinearLayout
@@ -65,9 +117,10 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="10dp"
-        android:paddingTop="6dp"
+        android:paddingTop="5dp"
         android:paddingEnd="10dp"
-        android:paddingBottom="6dp">
+        android:paddingBottom="5dp"
+        android:visibility="gone">
 
         <ImageView
             android:id="@+id/widget_accent_indicator"
@@ -91,7 +144,7 @@
                 android:maxLines="1"
                 android:text="Next Task"
                 android:textColor="#FFFFFF"
-                android:textSize="12sp"
+                android:textSize="11.5sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -106,14 +159,14 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Empty State Text (Hidden if tasks exist) -->
+    <!-- Empty State Text (Shown when neither classes nor tasks exist) -->
     <TextView
         android:id="@+id/widget_empty_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
         android:gravity="center"
-        android:text="All caught up! No pending tasks"
+        android:text="All caught up! No classes or tasks"
         android:textColor="#8E8E93"
         android:textSize="11.5sp"
         android:visibility="gone" />

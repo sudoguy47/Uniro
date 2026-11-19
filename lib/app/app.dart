@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/responsive.dart';
 import '../domain/haptics.dart';
 import '../models/settings.dart';
 import '../screens/onboarding_screen.dart';
@@ -55,7 +56,15 @@ class CampusTrackerApp extends StatelessWidget {
             );
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: base),
-          child: BoundaryHaptics(child: child ?? const SizedBox.shrink()),
+          child: Container(
+            color: colors.pageBg,
+            child: BoundaryHaptics(
+              child: ResponsiveContentContainer(
+                alignment: Alignment.center,
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+          ),
         );
       },
       home: showOnboarding

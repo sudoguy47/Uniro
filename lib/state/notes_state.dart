@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 import '../models/note.dart';
+import '../services/note_security_service.dart';
 import '../services/notes_store.dart';
 
 class NotesState extends ChangeNotifier {
   final NotesStore _store;
+  final NoteSecurityService _security;
 
-  NotesState({required NotesStore store}) : _store = store {
+  NotesState({required NotesStore store, NoteSecurityService? securityService})
+      : _store = store,
+        _security = securityService ?? NoteSecurityService.instance {
     _notes = List.of(_store.notes);
     _folders = List.of(_store.folders);
   }
@@ -39,6 +43,8 @@ class NotesState extends ChangeNotifier {
       final q = _searchQuery.toLowerCase();
       list = list.where((n) {
         if (n.title.toLowerCase().contains(q)) return true;
+        // Search must not reveal content of locked notes without authentication
+        if (n.isLocked) return false;
         return n.blocks.any((b) => b.text.toLowerCase().contains(q));
       }).toList();
     }
@@ -121,13 +127,27 @@ class NotesState extends ChangeNotifier {
     return note;
   }
 
-  void updateNote(Note updated) {
+  Future<void> updateNote(Note updated) async {
     if (updated.isEmpty) return;
-    final idx = _notes.indexWhere((n) => n.id == updated.id);
+    Note noteToSave = updated;
+
+    // Encrypt blocks at rest if locked
+    if (updated.isLocked && updated.blocks.isNotEmpty) {
+      try {
+        final encrypted =
+            await _security.encryptBlocks(updated.blocks);
+        noteToSave = updated.copyWith(
+          encryptedPayload: encrypted,
+          blocks: const [],
+        );
+      } catch (_) {}
+    }
+
+    final idx = _notes.indexWhere((n) => n.id == noteToSave.id);
     if (idx == -1) {
-      _notes = [updated, ..._notes];
+      _notes = [noteToSave, ..._notes];
     } else {
-      _notes = List.of(_notes)..[idx] = updated;
+      _notes = List.of(_notes)..[idx] = noteToSave;
     }
     _store.saveNotes(_notes);
     notifyListeners();
@@ -157,12 +177,65 @@ class NotesState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleLock(String id) {
-    _notes = _notes.map((n) => n.id == id
-        ? n.copyWith(isLocked: !n.isLocked, updatedAt: DateTime.now())
-        : n).toList();
-    _store.saveNotes(_notes);
-    notifyListeners();
+  /// Toggles note lock status with biometric/credential authentication and AES-GCM encryption.
+  /// Returns `true` if successful, or `false` if authentication failed or biometrics are unavailable.
+  Future<bool> toggleLock(String id, {List<NoteBlock>? activeBlocks}) async {
+    final idx = _notes.indexWhere((n) => n.id == id);
+    if (idx == -1) return false;
+    final note = _notes[idx];
+
+    if (!note.isLocked) {
+      // Locking note: verify device credential setup first
+      final canAuth = await _security.canAuthenticate();
+      if (!canAuth) {
+        return false;
+      }
+      final blocksToEncrypt = (activeBlocks != null && activeBlocks.isNotEmpty)
+          ? activeBlocks
+          : note.blocks;
+      try {
+        final encrypted =
+            await _security.encryptBlocks(blocksToEncrypt);
+        final lockedNote = note.copyWith(
+          isLocked: true,
+          encryptedPayload: encrypted,
+          blocks: const [],
+          updatedAt: DateTime.now(),
+        );
+        _notes = List.of(_notes)..[idx] = lockedNote;
+        _store.saveNotes(_notes);
+        notifyListeners();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    } else {
+      // Unlocking note: authenticate user first
+      final auth = await _security.authenticate(
+        localizedReason: 'Authenticate to remove note lock',
+      );
+      if (!auth) return false;
+
+      List<NoteBlock> decryptedBlocks = const [];
+      if (note.encryptedPayload != null && note.encryptedPayload!.isNotEmpty) {
+        try {
+          decryptedBlocks = await _security
+              .decryptBlocks(note.encryptedPayload!);
+        } catch (_) {
+          return false;
+        }
+      }
+      final unlockedNote = note.copyWith(
+        isLocked: false,
+        blocks: decryptedBlocks,
+        clearEncryptedPayload: true,
+        updatedAt: DateTime.now(),
+      );
+      _notes = List.of(_notes)..[idx] = unlockedNote;
+      _store.saveNotes(_notes);
+      notifyListeners();
+      return true;
+    }
   }
 
   void setColorTag(String id, int? color) {
@@ -193,6 +266,20 @@ class NotesState extends ChangeNotifier {
     }).toList();
     if (!changed) return;
     _store.saveNotes(_notes);
+    notifyListeners();
+  }
+
+  /// Re-reads notes + folders from disk (used after a backup import).
+  /// Never throws.
+  Future<void> reloadFromDisk() async {
+    await _store.load();
+    _notes = List.of(_store.notes);
+    _folders = List.of(_store.folders);
+    if (_activeFolder != 'All' &&
+        _activeFolder != 'Pinned' &&
+        !_folders.contains(_activeFolder)) {
+      _activeFolder = 'All';
+    }
     notifyListeners();
   }
 

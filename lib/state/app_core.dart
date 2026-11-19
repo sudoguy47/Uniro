@@ -5,6 +5,7 @@ import '../models/task.dart';
 import '../models/settings.dart';
 import '../services/local_store.dart';
 import '../services/notification_service.dart';
+import '../services/error_log.dart';
 import 'package:flutter/services.dart';
 
 mixin AppCore on ChangeNotifier {
@@ -79,31 +80,6 @@ mixin AppCore on ChangeNotifier {
   // malformed list items are skipped individually.
   void loadFromStore() {
     try {
-      final rawTasks = LocalStore.instance.load('tasks');
-      if (rawTasks is List && rawTasks.isNotEmpty) {
-        final parsed = <Task>[];
-        for (final j in rawTasks) {
-          try {
-            if (j is Map) {
-              parsed.add(
-                  Task.fromJson(Map<String, dynamic>.from(j)));
-            } else {
-              LocalStore.instance.markRecovery();
-            }
-          } catch (_) {
-            LocalStore.instance.markRecovery();
-            continue;
-          }
-        }
-        _tasks = parsed;
-        if (_tasks.isEmpty) {
-          persistNow();
-        }
-      } else {
-        // Fresh start: no preloaded demo data — the user adds their own.
-        _tasks = [];
-        persistNow();
-      }
       final rawSettings = LocalStore.instance.load('settings');
       if (rawSettings != null) {
         try {
@@ -117,6 +93,42 @@ mixin AppCore on ChangeNotifier {
           LocalStore.instance.markRecovery();
           _settings = UserSettings.defaults();
         }
+      } else {
+        _settings = UserSettings.defaults();
+      }
+
+      // Standalone app_theme check for rock-solid theme persistence
+      final savedTheme = LocalStore.instance.load('app_theme');
+      if (savedTheme is String) {
+        final matched = AppThemeMode.values.firstWhere(
+          (m) => m.name == savedTheme,
+          orElse: () => _settings.theme,
+        );
+        if (_settings.theme != matched) {
+          _settings = _settings.copyWith(theme: matched);
+        }
+      }
+
+      final rawTasks = LocalStore.instance.load('tasks');
+      if (rawTasks is List && rawTasks.isNotEmpty) {
+        final parsed = <Task>[];
+        for (final j in rawTasks) {
+          try {
+            if (j is Map) {
+              parsed.add(
+                  Task.fromJson(Map<String, dynamic>.from(j)));
+            } else {
+              LocalStore.instance.markRecovery();
+            }
+          } catch (e, st) {
+            ErrorLog.record(e, st, 'load_tasks');
+            LocalStore.instance.markRecovery();
+            continue;
+          }
+        }
+        _tasks = parsed;
+      } else {
+        _tasks = [];
       }
     } catch (_) {
       _tasks = [];
@@ -215,6 +227,7 @@ mixin AppCore on ChangeNotifier {
     _settings = s;
     notifyListeners();
     LocalStore.instance.save('settings', s.toJson());
+    LocalStore.instance.save('app_theme', s.theme.name);
     // Keep the daily 6 AM greeting in sync with name + toggle + tasks.
     unawaited(NotificationService.instance.scheduleDailyGreeting(
       name: s.name,

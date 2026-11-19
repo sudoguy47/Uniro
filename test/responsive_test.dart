@@ -85,7 +85,7 @@ void main() {
 
   Future<void> tourTabs(WidgetTester tester) async {
     for (final label in [
-      'Routine',
+      'Classes',
       'Focus',
       'Notes',
       'Profile',

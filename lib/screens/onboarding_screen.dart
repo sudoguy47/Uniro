@@ -8,6 +8,7 @@ import '../services/notification_service.dart';
 import '../state/app_state.dart';
 import '../widgets/onboarding_mascots.dart';
 import '../widgets/uniro_logo.dart';
+import '../widgets/app_notification.dart';
 
 /// Native Uniro onboarding matching the brand mocks:
 /// orange grad → blue calendar → green name → purple reminders.
@@ -82,11 +83,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // The name slide (index 2) is a hard gate: no empty name, no advance.
     if (_currentPage == 2 && _nameController.text.trim().isEmpty) {
       PremiumHaptics.edge();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your name to continue.'),
-          duration: Duration(seconds: 2),
-        ),
+      AppNotification.warning(
+        context,
+        'Please enter your name to continue.',
       );
       return;
     }
@@ -155,12 +154,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         _nameController.text.trim().isEmpty) {
                       _pageController.jumpToPage(2);
                       PremiumHaptics.edge();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text('Please enter your name to continue.'),
-                          duration: Duration(seconds: 2),
-                        ),
+                      AppNotification.warning(
+                        context,
+                        'Please enter your name to continue.',
                       );
                       return;
                     }
